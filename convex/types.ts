@@ -49,8 +49,9 @@ export type AdminData = {
   participants: { name: string; personalToken: string; teamCount: number }[];
   matches: { externalId: string; stage: string; label: string;
              homeTeam: TeamLite | null; awayTeam: TeamLite | null;
+             homeExternalId: string | null; awayExternalId: string | null;
              homeScore: number | null; awayScore: number | null;
-             status: string; manualOverride: boolean }[];
+             status: string; winnerExternalId: string | null; manualOverride: boolean }[];
 };
 
 export type TeamLite = { code: string; name: string; flag: string; group: string };

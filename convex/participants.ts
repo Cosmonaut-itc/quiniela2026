@@ -4,6 +4,8 @@ import { v } from "convex/values";
 import { newToken } from "./lib/tokens";
 import { drawN } from "./lib/distribution";
 import { teamLite, photoUrl } from "./lib/view";
+import { resolveQuiniela } from "./lib/perQuiniela";
+import type { Id } from "./_generated/dataModel";
 import type { PersonalData, PlayerStatus } from "./types";
 
 export const joinQuiniela = mutation({
@@ -48,52 +50,51 @@ export const getPersonalPanel = query({
     const qn = await ctx.db.get(me.quinielaId);
     if (!qn) throw new Error("Quiniela no encontrada");
 
-    const teams = await ctx.db.query("teams").collect();
-    const teamById = new Map(teams.map((t) => [t._id, t]));
+    const { teamById, effRows, states, championTeamId: champTeam } = await resolveQuiniela(ctx, me.quinielaId);
     const ownerships = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     const ownerByTeam = new Map(ownerships.map((o) => [o.teamId, o.participantId]));
     const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     const nameById = new Map(participants.map((p) => [p._id, p.name]));
+    const championParticipantId = champTeam ? ownerByTeam.get(champTeam as Id<"teams">) ?? null : null;
 
     const myTeamIds = ownerships.filter((o) => o.participantId === me._id).map((o) => o.teamId);
-    const allMatches = await ctx.db.query("matches").withIndex("by_kickoff").collect();
 
     function nextMatchFor(teamId: string) {
-      return allMatches
+      return effRows
         .filter((mt) => mt.status !== "finished" && (mt.homeTeamId === teamId || mt.awayTeamId === teamId))
         .sort((a, b) => a.kickoffAt - b.kickoffAt)[0];
     }
     function lastResultFor(teamId: string) {
-      const m = allMatches
-        .filter((mt) => mt.status === "finished" && (mt.homeTeamId === teamId || mt.awayTeamId === teamId))
+      const mt = effRows
+        .filter((x) => x.status === "finished" && (x.homeTeamId === teamId || x.awayTeamId === teamId))
         .sort((a, b) => b.kickoffAt - a.kickoffAt)[0];
-      if (!m) return null;
-      const h = teamById.get(m.homeTeamId!); const aw = teamById.get(m.awayTeamId!);
-      return `${h?.flag ?? ""} ${m.homeScore}–${m.awayScore} ${aw?.flag ?? ""}`;
+      if (!mt) return null;
+      const h = teamById.get(mt.homeTeamId as Id<"teams">); const aw = teamById.get(mt.awayTeamId as Id<"teams">);
+      return `${h?.flag ?? ""} ${mt.homeScore}–${mt.awayScore} ${aw?.flag ?? ""}`;
     }
 
     const teamsOut = myTeamIds.map((teamId) => {
       const tm = teamById.get(teamId)!;
-      const nm = nextMatchFor(teamId);
+      const nm = nextMatchFor(teamId as string);
       let nextMatch = null as PersonalData["teams"][number]["nextMatch"];
       if (nm) {
-        const oppId = nm.homeTeamId === teamId ? nm.awayTeamId : nm.homeTeamId;
+        const oppId = nm.homeTeamId === (teamId as string) ? nm.awayTeamId : nm.homeTeamId;
         if (oppId) {
           nextMatch = {
-            opponent: teamLite(teamById.get(oppId))!,
-            opponentOwner: ownerByTeam.has(oppId) ? nameById.get(ownerByTeam.get(oppId)!) ?? "—" : "Sin dueño",
+            opponent: teamLite(teamById.get(oppId as Id<"teams">))!,
+            opponentOwner: ownerByTeam.has(oppId as Id<"teams">) ? nameById.get(ownerByTeam.get(oppId as Id<"teams">)!) ?? "—" : "Sin dueño",
             kickoffAt: nm.kickoffAt,
           };
         }
       }
-      return { team: teamLite(tm)!, alive: tm.alive, group: tm.group, nextMatch, lastResult: lastResultFor(teamId) };
+      return { team: teamLite(tm)!, alive: states.get(teamId as string)!.alive, group: tm.group, nextMatch, lastResult: lastResultFor(teamId as string) };
     });
 
     const aliveCount = teamsOut.filter((x) => x.alive).length;
-    // on_reveal before the admin reveals: the player has joined but holds no teams yet.
+    // on_reveal antes de repartir: el jugador se unió pero aún no tiene equipos.
     const pendingReveal = qn.assignMode === "on_reveal" && qn.status === "open";
     const status: PlayerStatus = pendingReveal ? "pending"
-      : qn.championParticipantId === me._id ? "champion" : aliveCount > 0 ? "alive" : "out";
+      : championParticipantId === me._id ? "champion" : aliveCount > 0 ? "alive" : "out";
 
     // playingNow: my teams whose next match is live or starts within 3h
     const soon = Date.now() + 3 * 3600_000;
