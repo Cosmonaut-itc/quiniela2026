@@ -178,3 +178,35 @@ describe("getAdmin", () => {
     expect(admin.quiniela.assignMode).toBe("on_reveal");
   });
 });
+
+describe("getOverview prize", () => {
+  it("computes a per_person pool that grows as people join", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Rifa", prizeText: "", numParticipants: 20, prizeMode: "per_person", entryFee: 200,
+    });
+    for (const name of ["A", "B", "C"]) {
+      await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name });
+    }
+    let ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    expect(ov.quiniela.prize).toEqual({
+      mode: "per_person", text: "", entryFee: 200, pool: 600, contributors: 3,
+    });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "D" });
+    ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    expect(ov.quiniela.prize.pool).toBe(800);
+  });
+
+  it("returns a fixed prize for a legacy quiniela (no prizeMode stored)", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Vieja", prizeText: "$5,000", numParticipants: 4,
+    });
+    // simula una fila legacy sin prizeMode
+    await t.run((ctx) => ctx.db.patch(q.quinielaId, { prizeMode: undefined }));
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    expect(ov.quiniela.prize.mode).toBe("fixed");
+    expect(ov.quiniela.prize.text).toBe("$5,000");
+    expect(ov.quiniela.prize.pool).toBeNull();
+  });
+});

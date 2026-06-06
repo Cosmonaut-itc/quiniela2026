@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
-import { teamLite, photoUrl } from "./lib/view";
+import { teamLite, photoUrl, prizeView } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { OverviewData, PlayerStatus, AdminData, AssignMode } from "./types";
 
@@ -149,6 +149,7 @@ export const getOverview = query({
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
+        prize: prizeView(qn, participants.length),
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         assignMode: modeOf(qn),
@@ -188,6 +189,7 @@ export const getAdmin = query({
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
+        prize: prizeView(qn, participants.length),
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         joinToken: qn.joinToken, assignMode: modeOf(qn),

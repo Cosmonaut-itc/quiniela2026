@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { newToken } from "./lib/tokens";
 import { drawN } from "./lib/distribution";
-import { teamLite, photoUrl } from "./lib/view";
+import { teamLite, photoUrl, prizeView } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { Id } from "./_generated/dataModel";
 import type { PersonalData, PlayerStatus } from "./types";
@@ -108,6 +108,8 @@ export const getPersonalPanel = query({
 
     return {
       quinielaId: qn._id as string, quinielaName: qn.name, prizeText: qn.prizeText,
+      prize: prizeView(qn, participants.length),
+      status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
       joinToken: qn.joinToken,
       me: { name: me.name, photoUrl: await photoUrl(ctx, me.photoId), status, aliveCount, totalCount: teamsOut.length },
       playingNow,
