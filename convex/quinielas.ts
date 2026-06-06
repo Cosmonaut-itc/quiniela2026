@@ -1,10 +1,38 @@
 // convex/quinielas.ts
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
 import { teamLite, photoUrl } from "./lib/view";
 import type { OverviewData, PlayerStatus, AdminData } from "./types";
+
+// Shared by closeAndRedistribute (manual) and autoCloseDue (cron): assign every
+// unowned team to the participant with the fewest teams, then lock the quiniela.
+async function redistributeAndLock(
+  ctx: MutationCtx,
+  qn: Doc<"quinielas">,
+  participants: Doc<"participants">[],
+) {
+  const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+  const ownedSet = new Set(owned.map((o) => o.teamId));
+  const allTeams = await ctx.db.query("teams").collect();
+  const leftovers = allTeams.filter((tm) => !ownedSet.has(tm._id)).map((tm) => tm._id as string);
+  if (leftovers.length > 0) {
+    const counts = participants.map((p) => ({
+      participantId: p._id as string,
+      count: owned.filter((o) => o.participantId === p._id).length,
+    }));
+    for (const a of balancedRedistribute(leftovers, counts, Math.random)) {
+      await ctx.db.insert("ownerships", {
+        quinielaId: qn._id,
+        teamId: a.teamId as Id<"teams">,
+        participantId: a.participantId as Id<"participants">,
+      });
+    }
+  }
+  await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });
+}
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -48,25 +76,24 @@ export const closeAndRedistribute = mutation({
     const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     if (participants.length === 0) throw new Error("No hay participantes");
 
-    const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
-    const ownedSet = new Set(owned.map((o) => o.teamId));
-    const allTeams = await ctx.db.query("teams").collect();
-    const leftovers = allTeams.filter((tm) => !ownedSet.has(tm._id)).map((tm) => tm._id as string);
-
-    if (leftovers.length > 0) {
-      const counts = participants.map((p) => ({
-        participantId: p._id as string,
-        count: owned.filter((o) => o.participantId === p._id).length,
-      }));
-      const assignments = balancedRedistribute(leftovers, counts, Math.random);
-      for (const a of assignments) {
-        await ctx.db.insert("ownerships", {
-          quinielaId: qn._id, teamId: a.teamId as any, participantId: a.participantId as any,
-        });
-      }
-    }
-    await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });
+    await redistributeAndLock(ctx, qn, participants);
     return { ok: true as const };
+  },
+});
+
+// Cron-driven: once the first match has kicked off, lock every open quiniela that
+// has at least one participant (empty quinielas stay open so nobody loses a slot).
+export const autoCloseDue = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const firstMatch = await ctx.db.query("matches").withIndex("by_kickoff").first();
+    if (!firstMatch || Date.now() < firstMatch.kickoffAt) return;
+    const open = await ctx.db.query("quinielas").withIndex("by_status", (q) => q.eq("status", "open")).collect();
+    for (const qn of open) {
+      const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+      if (participants.length === 0) continue; // leave empty quinielas open
+      await redistributeAndLock(ctx, qn, participants);
+    }
   },
 });
 

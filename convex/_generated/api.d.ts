@@ -18,6 +18,7 @@ import type * as mundial from "../mundial.js";
 import type * as participants from "../participants.js";
 import type * as quinielas from "../quinielas.js";
 import type * as seed from "../seed.js";
+import type * as sync from "../sync.js";
 import type * as types from "../types.js";
 
 import type {
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   participants: typeof participants;
   quinielas: typeof quinielas;
   seed: typeof seed;
+  sync: typeof sync;
   types: typeof types;
 }>;
 
