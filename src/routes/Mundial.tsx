@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { useParams } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { GroupsView } from "@/components/GroupsView";
 import { BracketView } from "@/components/BracketView";
 import { Shell, BottomNav } from "@/components/Shell";
@@ -23,7 +24,7 @@ function LoadingState() {
 
 export default function Mundial() {
   const { id } = useParams();
-  const data = useQuery(api.mundial.getMundial, { quinielaId: id as any });
+  const data = useQuery(api.mundial.getMundial, { quinielaId: id as Id<"quinielas"> });
 
   if (data === undefined) return <LoadingState />;
 

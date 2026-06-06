@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
 import { PlayerRow } from "@/components/PlayerRow";
 import { DuelRow } from "@/components/DuelRow";
@@ -65,7 +66,7 @@ export default function Join() {
       const res = await join({
         joinToken: token!,
         name,
-        photoId: photoId as any,
+        photoId: photoId as Id<"_storage"> | undefined,
       });
       localStorage.setItem(`quiniela:${id}:me`, res.personalToken);
       nav(`/q/${id}/me/${res.personalToken}`);

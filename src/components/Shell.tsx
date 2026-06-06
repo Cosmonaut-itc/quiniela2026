@@ -34,6 +34,20 @@ export function Shell({
 type NavKey = "me" | "general" | "mundial";
 
 /**
+ * Reads the persisted personal token for a quiniela. Some browsers (e.g. Safari
+ * private mode) throw a SecurityError on localStorage access even when the
+ * object is defined, so guard the read and fall back to null.
+ */
+function readStoredMeToken(id: string): string | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage.getItem(`quiniela:${id}:me`);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Sticky bottom navigation matching the 3-tab wireframe
  * (Mi panel · General · Mundial). Links are built from the quiniela id and the
  * optional personal/join tokens that are available in the current context.
@@ -49,11 +63,7 @@ export function BottomNav({
   meToken?: string | null;
   joinToken?: string | null;
 }) {
-  const stored =
-    meToken ??
-    (typeof localStorage !== "undefined"
-      ? localStorage.getItem(`quiniela:${id}:me`)
-      : null);
+  const stored = meToken ?? readStoredMeToken(id);
 
   const items: { key: NavKey; label: string; emoji: string; to: string | null }[] =
     [

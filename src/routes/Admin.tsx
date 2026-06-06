@@ -49,8 +49,12 @@ export default function Admin() {
         : "Finalizada";
 
   async function copy(text: string, msg = "Copiado") {
-    await navigator.clipboard.writeText(text);
-    toast.success(msg);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(msg);
+    } catch {
+      toast.error("No se pudo copiar al portapapeles");
+    }
   }
 
   async function onClose() {

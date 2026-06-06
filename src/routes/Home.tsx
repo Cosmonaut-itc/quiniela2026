@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
 import { Shell } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export default function Home() {
         name,
         prizeText: prize,
         numParticipants: n,
-        photoId: photoId as any,
+        photoId: photoId as Id<"_storage"> | undefined,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
     } finally {
