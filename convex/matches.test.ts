@@ -101,4 +101,28 @@ describe("seed + recompute", () => {
     expect(stored!.winnerTeamId).toBe(winner!._id); // explicit winner wins over the tie
     expect(stored!.manualOverride).toBe(true);
   });
+
+  it("clearMatchResultManual reverts a manual result to scheduled with no points", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const gm = await t.run((ctx) =>
+      ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "group")).first());
+    const externalId = gm!.externalId;
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    // enter a 0-0 draw (gives both teams a point), then clear it
+    await t.mutation(api.matches.setMatchResultManual, {
+      adminToken: q.adminToken, matchExternalId: externalId,
+      homeScore: 0, awayScore: 0, finished: true,
+    });
+    await t.mutation(api.matches.clearMatchResultManual, {
+      adminToken: q.adminToken, matchExternalId: externalId,
+    });
+    const stored = await t.run((ctx) =>
+      ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", externalId)).first());
+    expect(stored!.status).toBe("scheduled");
+    expect(stored!.homeScore).toBeUndefined();
+    expect(stored!.awayScore).toBeUndefined();
+    expect(stored!.winnerTeamId).toBeUndefined();
+    expect(stored!.manualOverride).toBe(false);
+  });
 });

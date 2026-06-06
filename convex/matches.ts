@@ -132,3 +132,27 @@ export const setMatchResultManual = mutation({
     return { ok: true as const };
   },
 });
+
+/**
+ * Inverse of setMatchResultManual: wipes a manually-entered result, returning the
+ * match to "scheduled" with no score/winner and releasing manualOverride so the
+ * automated sync governs it again. Use to undo a wrongly-entered score.
+ */
+export const clearMatchResultManual = mutation({
+  args: { adminToken: v.string(), matchExternalId: v.string() },
+  handler: async (ctx, args) => {
+    const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const match = await ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId)).first();
+    if (!match) throw new Error("Partido no encontrado");
+    await ctx.db.patch(match._id, {
+      homeScore: undefined,
+      awayScore: undefined,
+      winnerTeamId: undefined,
+      status: "scheduled",
+      manualOverride: false,
+    });
+    await ctx.runMutation(internal.matches.recomputeTeamStates, {});
+    return { ok: true as const };
+  },
+});
