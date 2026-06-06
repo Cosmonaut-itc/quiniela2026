@@ -12,6 +12,30 @@
 
 ---
 
+## Reconciliación con `de3fb17` (modo de reparto) y `clearMatchResultManual`
+
+> Mientras se escribía este plan, otra sesión avanzó `main` hasta `de3fb17` (feature
+> "modo de reparto on_join/on_reveal") + `clearMatchResultManual` (revert GLOBAL). La rama
+> de este trabajo se rebasó sobre ese `main`; el código base == `main`, la rama solo añade docs.
+> La arquitectura de overrides por quiniela es **ortogonal** al modo de reparto: se **fusiona**, no se reemplaza.
+
+Deltas a respetar al ejecutar (los bloques de código de abajo se redactaron contra versiones previas):
+- **PRESERVAR** en las queries lo que añadió `de3fb17`/`4ddcbf9`:
+  - `joinToken` en el retorno de `getPersonalPanel` (`PersonalData.joinToken`) y de `getAdmin` (`quiniela.joinToken`).
+  - Lógica `pendingReveal` → `status: "pending"` en `getPersonalPanel` y `getOverview`
+    (`pendingReveal = modeOf(qn) === "on_reveal" && qn.status === "open"`).
+  - `assignMode: modeOf(qn)` en el objeto `quiniela` de `getOverview` y `getAdmin`.
+  - El helper `modeOf` y el tipo `AssignMode` ya existen en `quinielas.ts`/`types.ts`.
+  - `PlayerStatus` ya incluye `"pending"`.
+  - El `status:"finished"` DERIVADO (`championParticipantId ? "finished" : qn.status`) convive con `assignMode` en el objeto quiniela.
+- **ELIMINAR** `clearMatchResultManual` (revert global) de `convex/matches.ts` y su test en
+  `convex/matches.test.ts` (decisión del usuario): lo sustituye `clearMatchOverride` por quiniela. La UI aún no lo usaba.
+- **Admin.tsx:** fusionar con la sección `reveal`/"🎲 Repartir equipos ahora" (intacta, de `de3fb17`);
+  los cambios de revert + selector van solo en la tarjeta de "Corregir marcador".
+- **Base CodeRabbit:** `de3fb17` (no `main` viejo).
+
+---
+
 ## Estructura de archivos
 
 **Crear:**
