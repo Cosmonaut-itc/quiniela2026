@@ -58,7 +58,7 @@ export function detectSyncEvents(input: SyncInput): NotifyIntent[] {
       [mt.awayTeamId, mt.awayTeamId ? ownerByTeam.get(mt.awayTeamId) : undefined],
     ];
 
-    if (mt.status !== "finished" && mt.kickoffAt >= now && mt.kickoffAt <= now + soonMs) {
+    if (mt.status === "scheduled" && mt.kickoffAt >= now && mt.kickoffAt <= now + soonMs) {
       for (const [teamId, owner] of pairs) {
         if (!teamId || !owner) continue;
         const oppId = teamId === mt.homeTeamId ? mt.awayTeamId : mt.homeTeamId;
@@ -83,6 +83,8 @@ export function detectSyncEvents(input: SyncInput): NotifyIntent[] {
     }
   }
 
+  // A lo más un equipo puede ser "champion" (lo garantiza computeTeamStates en tournament.ts),
+  // así que una sola variable basta para excluir a su dueño de "disqualified".
   let championOwner: string | null = null;
   for (const [teamId, st] of states) {
     if (st.currentStage === "champion") {

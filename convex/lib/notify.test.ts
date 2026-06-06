@@ -60,6 +60,21 @@ describe("detectSyncEvents", () => {
     expect(within.filter((i) => i.type === "match_soon")).toHaveLength(2);
     const far = detectSyncEvents({ ...base, now, effMatches: [scheduled(now + 5 * 3600_000)] });
     expect(far.filter((i) => i.type === "match_soon")).toHaveLength(0);
+    const past = detectSyncEvents({ ...base, now, effMatches: [scheduled(now - 1)] });
+    expect(past.filter((i) => i.type === "match_soon")).toHaveLength(0);
+  });
+
+  it("match_result con empate dice 'empató'", () => {
+    const intents = detectSyncEvents({
+      quinielaId: "Q", now: 10_000, soonMs: SOON, tournamentStarted: false,
+      teamById: tById(), effMatches: [finishedMatch(null)],
+      states: new Map([["t1", alive()], ["t2", alive()]]),
+      ownerByTeam: new Map([["t1", "p1"], ["t2", "p2"]]),
+      participants: [{ id: "p1", teamCount: 1 }, { id: "p2", teamCount: 1 }],
+    });
+    const results = intents.filter((i) => i.type === "match_result");
+    expect(results).toHaveLength(2);
+    expect(results.every((i) => i.title.includes("empató"))).toBe(true);
   });
 
   it("emite team_eliminated por equipo fuera y disqualified si no le queda ninguno vivo", () => {
