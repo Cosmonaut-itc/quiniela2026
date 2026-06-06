@@ -13,6 +13,7 @@ import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
 import type * as lib_view from "../lib/view.js";
 import type * as matches from "../matches.js";
+import type * as mundial from "../mundial.js";
 import type * as participants from "../participants.js";
 import type * as quinielas from "../quinielas.js";
 import type * as seed from "../seed.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tournament": typeof lib_tournament;
   "lib/view": typeof lib_view;
   matches: typeof matches;
+  mundial: typeof mundial;
   participants: typeof participants;
   quinielas: typeof quinielas;
   seed: typeof seed;
