@@ -70,4 +70,18 @@ export default defineSchema({
     .index("by_quiniela_team", ["quinielaId", "teamId"])
     .index("by_quiniela_participant", ["quinielaId", "participantId"])
     .index("by_quiniela", ["quinielaId"]),
+
+  // Corrección manual de marcador POR QUINIELA. La presencia de una fila = ese
+  // partido está corregido a mano en esa quiniela; se superpone al resultado
+  // global (API) solo para esa quiniela. El `matches` global nunca se toca.
+  matchOverrides: defineTable({
+    quinielaId: v.id("quinielas"),
+    matchId: v.id("matches"),
+    homeScore: v.number(),
+    awayScore: v.number(),
+    status: v.string(), // "finished" | "live"
+    winnerTeamId: v.optional(v.id("teams")),
+  })
+    .index("by_quiniela", ["quinielaId"])
+    .index("by_quiniela_match", ["quinielaId", "matchId"]),
 });
