@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
+import { insertNotification } from "./notifications";
 
 const modules = import.meta.glob("./**/*.*s");
 
@@ -34,13 +35,35 @@ describe("lectura y marcado de avisos", () => {
   });
 
   it("listForAdmin devuelve solo los avisos de audiencia admin de esa quiniela", async () => {
-    const { t, q } = await quinielaWithPlayer();
+    const { t, q, personalToken } = await quinielaWithPlayer();
+    const me = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_personalToken", (x) => x.eq("personalToken", personalToken)).first());
     await t.run((ctx) => ctx.db.insert("notifications", {
       quinielaId: q.quinielaId, audience: "admin",
       type: "player_joined", title: "Nuevo", body: "x", createdAt: Date.now(), dedupeKey: "k2",
     }));
+    await t.run((ctx) => ctx.db.insert("notifications", {
+      quinielaId: q.quinielaId, audience: "participant", participantId: me!._id,
+      type: "teams_assigned", title: "Equipos", body: "y", createdAt: Date.now(), dedupeKey: "k3",
+    }));
     const list = await t.query(api.notifications.listForAdmin, { adminToken: q.adminToken });
     expect(list.items.some((n) => n.type === "player_joined")).toBe(true);
+    expect(list.items.some((n) => n.type === "teams_assigned")).toBe(false);
+  });
+
+  it("insertNotification es idempotente por dedupeKey", async () => {
+    const { t, q, personalToken } = await quinielaWithPlayer();
+    const me = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_personalToken", (x) => x.eq("personalToken", personalToken)).first());
+    const intent = {
+      quinielaId: q.quinielaId as string, audience: "participant" as const, participantId: me!._id as string,
+      type: "test", title: "T", body: "B", matchId: null, teamId: null, dedupeKey: "dup-1",
+    };
+    await t.run((ctx) => insertNotification(ctx, intent));
+    await t.run((ctx) => insertNotification(ctx, intent));
+    const rows = await t.run((ctx) =>
+      ctx.db.query("notifications").withIndex("by_dedupe", (x) => x.eq("dedupeKey", "dup-1")).collect());
+    expect(rows).toHaveLength(1);
   });
 
   it("listForParticipant lanza con token inválido", async () => {

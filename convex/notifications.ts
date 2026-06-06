@@ -96,7 +96,7 @@ export const markRead = mutation({
       rows = await ctx.db
         .query("notifications")
         .withIndex("by_participant", (q) => q.eq("participantId", me._id))
-        .collect();
+        .filter((q) => q.eq(q.field("readAt"), undefined)).collect();
     } else if (args.adminToken) {
       const qn = await ctx.db
         .query("quinielas")
@@ -108,13 +108,11 @@ export const markRead = mutation({
         .withIndex("by_quiniela_audience", (q) =>
           q.eq("quinielaId", qn._id).eq("audience", "admin"),
         )
-        .collect();
+        .filter((q) => q.eq(q.field("readAt"), undefined)).collect();
     } else {
       throw new Error("Falta token");
     }
-    for (const r of rows) {
-      if (r.readAt == null) await ctx.db.patch(r._id, { readAt: now });
-    }
+    for (const r of rows) await ctx.db.patch(r._id, { readAt: now });
     return { ok: true as const };
   },
 });
