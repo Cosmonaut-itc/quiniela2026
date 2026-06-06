@@ -8,13 +8,19 @@
  * @module
  */
 
+import type * as lib_tokens from "../lib/tokens.js";
+import type * as types from "../types.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  "lib/tokens": typeof lib_tokens;
+  types: typeof types;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
