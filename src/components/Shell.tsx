@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -34,16 +34,26 @@ export function Shell({
 type NavKey = "me" | "general" | "mundial";
 
 /**
- * Reads the persisted personal token for a quiniela. Some browsers (e.g. Safari
+ * Reads a persisted nav token for a quiniela. Some browsers (e.g. Safari
  * private mode) throw a SecurityError on localStorage access even when the
  * object is defined, so guard the read and fall back to null.
  */
-function readStoredMeToken(id: string): string | null {
+function readStoredToken(id: string, kind: "me" | "join"): string | null {
   try {
     if (typeof localStorage === "undefined") return null;
-    return localStorage.getItem(`quiniela:${id}:me`);
+    return localStorage.getItem(`quiniela:${id}:${kind}`);
   } catch {
     return null;
+  }
+}
+
+/** Persists a nav token so tokenless routes (e.g. Mundial) can still link to it. */
+function persistToken(id: string, kind: "me" | "join", value: string) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(`quiniela:${id}:${kind}`, value);
+  } catch {
+    // private mode / disabled storage — non-fatal, fall back to prop-only nav
   }
 }
 
@@ -63,7 +73,15 @@ export function BottomNav({
   meToken?: string | null;
   joinToken?: string | null;
 }) {
-  const stored = meToken ?? readStoredMeToken(id);
+  // Persist whatever tokens this page knows so tokenless routes (Mundial) can
+  // still reach Mi panel / General via the localStorage fallback below.
+  useEffect(() => {
+    if (meToken) persistToken(id, "me", meToken);
+    if (joinToken) persistToken(id, "join", joinToken);
+  }, [id, meToken, joinToken]);
+
+  const storedMe = meToken ?? readStoredToken(id, "me");
+  const storedJoin = joinToken ?? readStoredToken(id, "join");
 
   const items: { key: NavKey; label: string; emoji: string; to: string | null }[] =
     [
@@ -71,13 +89,13 @@ export function BottomNav({
         key: "me",
         label: "Mi panel",
         emoji: "👤",
-        to: stored ? `/q/${id}/me/${stored}` : null,
+        to: storedMe ? `/q/${id}/me/${storedMe}` : null,
       },
       {
         key: "general",
         label: "General",
         emoji: "📋",
-        to: joinToken ? `/q/${id}/join/${joinToken}` : null,
+        to: storedJoin ? `/q/${id}/join/${storedJoin}` : null,
       },
       { key: "mundial", label: "Mundial", emoji: "🌍", to: `/q/${id}/mundial` },
     ];
