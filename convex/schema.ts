@@ -63,6 +63,7 @@ export default defineSchema({
     personalToken: v.string(),
     slotIndex: v.number(),
     joinedAt: v.number(),
+    paid: v.optional(v.boolean()), // solo relevante en per_person; ausente = no pagó
   })
     .index("by_personalToken", ["personalToken"])
     .index("by_quiniela", ["quinielaId"]),

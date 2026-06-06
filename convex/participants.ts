@@ -42,6 +42,18 @@ export const joinQuiniela = mutation({
   },
 });
 
+export const setParticipantPaid = mutation({
+  args: { adminToken: v.string(), participantId: v.id("participants"), paid: v.boolean() },
+  handler: async (ctx, args) => {
+    const p = await ctx.db.get(args.participantId);
+    if (!p) throw new Error("Participante no encontrado");
+    const qn = await ctx.db.get(p.quinielaId);
+    if (!qn || qn.adminToken !== args.adminToken) throw new Error("No autorizado");
+    await ctx.db.patch(args.participantId, { paid: args.paid });
+    return { ok: true as const };
+  },
+});
+
 export const getPersonalPanel = query({
   args: { personalToken: v.string() },
   handler: async (ctx, args): Promise<PersonalData> => {
@@ -106,9 +118,10 @@ export const getPersonalPanel = query({
         status: (x.nextMatch!.kickoffAt <= Date.now() ? "live" : "scheduled") as "live" | "scheduled",
       }));
 
+    const paidCount = participants.filter((p) => p.paid === true).length;
     return {
       quinielaId: qn._id as string, quinielaName: qn.name,
-      prize: prizeView(qn, participants.length),
+      prize: prizeView(qn, paidCount),
       status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
       joinToken: qn.joinToken,
       me: { name: me.name, photoUrl: await photoUrl(ctx, me.photoId), status, aliveCount, totalCount: teamsOut.length },

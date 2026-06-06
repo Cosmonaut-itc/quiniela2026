@@ -177,10 +177,19 @@ describe("getAdmin", () => {
     const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
     expect(admin.quiniela.assignMode).toBe("on_reveal");
   });
+
+  it("exposes participant id and paid flag (default false)", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(admin.participants[0].id).toBeDefined();
+    expect(admin.participants[0].paid).toBe(false);
+  });
 });
 
 describe("getOverview prize", () => {
-  it("computes a per_person pool that grows as people join", async () => {
+  it("computes a per_person pool from PAID participants, not just joiners", async () => {
     const t = await seeded();
     const q = await t.mutation(api.quinielas.createQuiniela, {
       name: "Rifa", prizeText: "", numParticipants: 20, prizeMode: "per_person", entryFee: 200,
@@ -188,13 +197,19 @@ describe("getOverview prize", () => {
     for (const name of ["A", "B", "C"]) {
       await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name });
     }
+    // nadie marcado como pagado → bote 0, pero 3 inscritos
     let ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
-    expect(ov.quiniela.prize).toEqual({
-      mode: "per_person", text: "", entryFee: 200, pool: 600, contributors: 3,
-    });
-    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "D" });
+    expect(ov.quiniela.filledCount).toBe(3);
+    expect(ov.quiniela.prize.pool).toBe(0);
+    expect(ov.quiniela.prize.contributors).toBe(0);
+    // el admin confirma dos pagos → bote 400
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[0]._id, paid: true });
+    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[1]._id, paid: true });
     ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
-    expect(ov.quiniela.prize.pool).toBe(800);
+    expect(ov.quiniela.prize.pool).toBe(400);
+    expect(ov.quiniela.prize.contributors).toBe(2);
   });
 
   it("returns a fixed prize for a legacy quiniela (no prizeMode stored)", async () => {

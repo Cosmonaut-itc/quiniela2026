@@ -16,7 +16,7 @@ export type PrizeView = {
   text: string;            // fixed: prizeText. per_person: "".
   entryFee: number | null; // per_person: la cuota. fixed: null.
   pool: number | null;     // per_person: entryFee * contributors. fixed: null.
-  contributors: number;    // filledCount (relevante en per_person).
+  contributors: number;    // per_person: cuántos han PAGADO (definen el bote). fixed: irrelevante.
 };
 
 export type OverviewData = {
@@ -60,7 +60,7 @@ export type AdminData = {
   quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
               joinToken: string; assignMode: AssignMode; notes: string | null };
-  participants: { name: string; personalToken: string; teamCount: number }[];
+  participants: { id: string; name: string; personalToken: string; teamCount: number; paid: boolean }[];
   matches: { externalId: string; stage: string; label: string;
              homeTeam: TeamLite | null; awayTeam: TeamLite | null;
              homeExternalId: string | null; awayExternalId: string | null;

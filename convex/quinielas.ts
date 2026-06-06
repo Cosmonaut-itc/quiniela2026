@@ -159,11 +159,12 @@ export const getOverview = query({
       .sort((a, b) => a.kickoffAt - b.kickoffAt)
       .slice(0, 8);
     const nameById = new Map(participants.map((p) => [p._id, p.name]));
+    const paidCount = participants.filter((p) => p.paid === true).length;
 
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId),
-        prize: prizeView(qn, participants.length),
+        prize: prizeView(qn, paidCount),
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         assignMode: modeOf(qn),
@@ -201,18 +202,20 @@ export const getAdmin = query({
       sf: "Semis", third: "3er lugar", final: "Final",
     };
     const sorted = [...matches].sort((a, b) => a.kickoffAt - b.kickoffAt);
+    const paidCount = participants.filter((p) => p.paid === true).length;
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId),
-        prize: prizeView(qn, participants.length),
+        prize: prizeView(qn, paidCount),
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         joinToken: qn.joinToken, assignMode: modeOf(qn),
         notes: qn.notes ?? null,
       },
       participants: participants.map((p) => ({
-        name: p.name, personalToken: p.personalToken,
+        id: p._id as string, name: p.name, personalToken: p.personalToken,
         teamCount: ownerships.filter((o) => o.participantId === p._id).length,
+        paid: p.paid === true,
       })),
       matches: sorted.map((mt) => {
         const e = effById.get(mt._id as string)!;

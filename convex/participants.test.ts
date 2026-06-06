@@ -79,3 +79,39 @@ describe("getPersonalPanel", () => {
     expect(panel.teams.length).toBe(0);
   });
 });
+
+describe("setParticipantPaid", () => {
+  it("marks and unmarks a participant as paid", async () => {
+    const { t, q } = await setup(4);
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[0]._id, paid: true });
+    let admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(admin.participants[0].paid).toBe(true);
+    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[0]._id, paid: false });
+    admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(admin.participants[0].paid).toBe(false);
+  });
+
+  it("rejects a foreign adminToken", async () => {
+    const { t, q } = await setup(4);
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await expect(
+      t.mutation(api.participants.setParticipantPaid, { adminToken: "ajeno", participantId: ps[0]._id, paid: true }),
+    ).rejects.toThrow();
+  });
+
+  it("still works after the quiniela is locked (late payments)", async () => {
+    const { t, q } = await setup(4);
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[0]._id, paid: true });
+    const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(admin.participants[0].paid).toBe(true);
+  });
+});
