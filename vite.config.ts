@@ -17,7 +17,7 @@ export default defineConfig({
     // pragma; frontend `.test.tsx` files opt into jsdom the same way.
     environment: "node",
     globals: true,
-    setupFiles: [],
+    setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.test.{ts,tsx}", "convex/**/*.test.ts"],
   },
 });
