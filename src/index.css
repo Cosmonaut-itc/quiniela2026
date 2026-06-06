@@ -149,6 +149,9 @@
     content: "";
     position: absolute;
     inset: 0;
+    /* Hereda el radio del panel: sin esto, el overlay cuadrado asoma sus
+       esquinas tras los bordes redondeados de las cartas sin overflow-hidden. */
+    border-radius: inherit;
     pointer-events: none;
     opacity: 0.5;
     mix-blend-mode: overlay;
