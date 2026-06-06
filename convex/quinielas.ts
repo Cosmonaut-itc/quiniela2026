@@ -148,7 +148,7 @@ export const getOverview = query({
 
     return {
       quiniela: {
-        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
+        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId),
         prize: prizeView(qn, participants.length),
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
@@ -188,7 +188,7 @@ export const getAdmin = query({
     const sorted = [...matches].sort((a, b) => a.kickoffAt - b.kickoffAt);
     return {
       quiniela: {
-        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
+        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId),
         prize: prizeView(qn, participants.length),
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",

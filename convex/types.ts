@@ -21,7 +21,7 @@ export type PrizeView = {
 
 
 export type OverviewData = {
-  quiniela: { name: string; photoUrl: string | null; prizeText: string; prize: PrizeView;
+  quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
               assignMode: AssignMode };
   players: { participantId: string; name: string; photoUrl: string | null;
@@ -34,7 +34,6 @@ export type OverviewData = {
 export type PersonalData = {
   quinielaId: string;
   quinielaName: string;
-  prizeText: string;
   prize: PrizeView;
   status: "open" | "locked" | "finished";
   joinToken: string;
@@ -59,7 +58,7 @@ export type MundialData = {
 };
 
 export type AdminData = {
-  quiniela: { name: string; photoUrl: string | null; prizeText: string; prize: PrizeView;
+  quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
               joinToken: string; assignMode: AssignMode };
   participants: { name: string; personalToken: string; teamCount: number }[];

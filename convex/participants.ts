@@ -107,7 +107,7 @@ export const getPersonalPanel = query({
       }));
 
     return {
-      quinielaId: qn._id as string, quinielaName: qn.name, prizeText: qn.prizeText,
+      quinielaId: qn._id as string, quinielaName: qn.name,
       prize: prizeView(qn, participants.length),
       status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
       joinToken: qn.joinToken,
