@@ -3,16 +3,12 @@ import { useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
+import { Shell } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+
+const FLAGS = ["🇲🇽", "🇧🇷", "🇦🇷", "🇫🇷", "🇪🇸", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇵🇹", "🇳🇱", "🇺🇸", "🇨🇦", "🇯🇵"];
 
 export default function Home() {
   const create = useMutation(api.quinielas.createQuiniela);
@@ -44,93 +40,101 @@ export default function Home() {
   const disabled = busy || uploading || !name.trim() || n < 2;
 
   return (
-    <div className="min-h-svh bg-background px-4 py-10">
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-6 text-center">
-          <p className="text-sm font-medium text-muted-foreground">
+    <Shell className="flex min-h-svh flex-col justify-center">
+      <div className="animate-rise">
+        {/* Hero */}
+        <header className="grain bg-pitch relative mb-6 overflow-hidden rounded-3xl border border-border px-6 py-8 text-center [background:linear-gradient(160deg,oklch(0.3_0.06_174/0.7),oklch(0.24_0.04_166/0.4))]">
+          <div className="mb-3 flex justify-center gap-1 text-2xl">
+            {FLAGS.slice(0, 6).map((f, i) => (
+              <span key={i}>{f}</span>
+            ))}
+          </div>
+          <p className="text-xs font-bold tracking-[0.22em] text-gold uppercase">
             Mundial 2026
           </p>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            Crear quiniela · Mundial 2026
+          <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight">
+            Quiniela Mundial
           </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Crea tu quiniela, reparte equipos al azar y que gane el dueño del
+            campeón. 🏆
+          </p>
         </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Nueva quiniela</CardTitle>
-            <CardDescription>
-              Define los datos y reparte el acceso a tus participantes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form
-              className="flex flex-col gap-5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submit();
-              }}
-            >
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="name">Nombre</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Quiniela de la oficina"
-                  maxLength={60}
-                  autoFocus
-                />
-              </div>
+        {/* Form */}
+        <form
+          className="grain relative flex flex-col gap-5 rounded-3xl border border-border bg-card p-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="name">Nombre de la quiniela</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Quiniela de la oficina"
+              maxLength={60}
+              autoFocus
+            />
+          </div>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="prize">Premio</Label>
-                <Input
-                  id="prize"
-                  value={prize}
-                  onChange={(e) => setPrize(e.target.value)}
-                  placeholder="La gloria eterna"
-                  maxLength={60}
-                />
-              </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="prize">Premio</Label>
+            <Input
+              id="prize"
+              value={prize}
+              onChange={(e) => setPrize(e.target.value)}
+              placeholder="$5,000 / La gloria eterna"
+              maxLength={60}
+            />
+          </div>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="n">Número de participantes</Label>
-                <Input
-                  id="n"
-                  type="number"
-                  inputMode="numeric"
-                  min={2}
-                  max={48}
-                  value={n}
-                  onChange={(e) =>
-                    setN(
-                      Math.max(
-                        2,
-                        Math.min(48, Math.floor(Number(e.target.value) || 0)),
-                      ),
-                    )
-                  }
-                />
-                <p className="text-xs text-muted-foreground">Entre 2 y 48.</p>
-              </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="n">Número de participantes</Label>
+            <Input
+              id="n"
+              type="number"
+              inputMode="numeric"
+              min={2}
+              max={48}
+              value={n}
+              onChange={(e) =>
+                setN(
+                  Math.max(
+                    2,
+                    Math.min(48, Math.floor(Number(e.target.value) || 0)),
+                  ),
+                )
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Entre 2 y 48 · los 48 equipos se reparten entre ustedes.
+            </p>
+          </div>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="photo">Foto (opcional)</Label>
-                <Input
-                  id="photo"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-              </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="photo">Foto (opcional)</Label>
+            <Input
+              id="photo"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
 
-              <Button type="submit" size="lg" disabled={disabled}>
-                {busy ? "Creando…" : "Crear quiniela"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={disabled}
+            className="glow-primary h-12 rounded-2xl text-base font-bold"
+          >
+            {busy ? "Creando…" : "⚽ Crear quiniela"}
+          </Button>
+        </form>
       </div>
-    </div>
+    </Shell>
   );
 }
