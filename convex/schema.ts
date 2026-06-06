@@ -39,6 +39,8 @@ export default defineSchema({
     name: v.string(),
     photoId: v.optional(v.id("_storage")),
     prizeText: v.string(),
+    prizeMode: v.optional(v.string()), // "fixed" | "per_person"; ausente = "fixed" (legacy)
+    entryFee: v.optional(v.number()),  // solo per_person; entero >= 1 (pesos)
     numParticipants: v.number(),
     slotSizes: v.array(v.number()),
     adminToken: v.string(),
