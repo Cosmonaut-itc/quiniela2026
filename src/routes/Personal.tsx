@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
 import { Skeleton } from "@/components/ui/skeleton";
-import { whenLabel } from "@/lib/format";
+import { whenLabel, prizeBanner } from "@/lib/format";
 
 function LoadingState() {
   return (
@@ -84,11 +84,10 @@ export default function Personal() {
             className="shrink-0 self-start"
           />
         </div>
-        <PrizeBanner
-          text={
-            data.prizeText && `${data.prizeText} — para el dueño del campeón`
-          }
-        />
+        {(() => {
+          const b = prizeBanner(data.prize, data.status, " — para el dueño del campeón");
+          return b ? <PrizeBanner title={b.title} subline={b.subline} /> : null;
+        })()}
       </header>
 
       {me.status === "pending" && (

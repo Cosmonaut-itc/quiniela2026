@@ -8,6 +8,7 @@ import { PlayerRow } from "@/components/PlayerRow";
 import { DuelRow } from "@/components/DuelRow";
 import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
+import { prizeBanner } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,7 +113,10 @@ export default function Join() {
             </p>
           </div>
         </div>
-        <PrizeBanner text={quiniela.prizeText && `${quiniela.prizeText} al campeón`} />
+        {(() => {
+          const b = prizeBanner(quiniela.prize, quiniela.status, " al campeón");
+          return b ? <PrizeBanner title={b.title} subline={b.subline} /> : null;
+        })()}
       </header>
 
       {/* Players table */}

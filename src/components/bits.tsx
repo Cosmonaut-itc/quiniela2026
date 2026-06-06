@@ -21,13 +21,16 @@ export function SectionHeading({
   );
 }
 
-/** Golden prize banner. `🏆 {text}`. */
-export function PrizeBanner({ text }: { text: string }) {
-  if (!text) return null;
+/** Golden prize banner: `🏆 {title}` con subline opcional. */
+export function PrizeBanner({ title, subline }: { title: string; subline?: string }) {
+  if (!title) return null;
   return (
     <div className="grain relative mt-4 flex items-center gap-2.5 overflow-hidden rounded-2xl border border-gold/30 px-4 py-3 [background:linear-gradient(100deg,oklch(0.32_0.06_84/0.55),oklch(0.28_0.04_70/0.35))]">
       <span className="text-xl leading-none">🏆</span>
-      <span className="text-sm font-semibold text-gold">{text}</span>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-gold">{title}</div>
+        {subline && <div className="text-xs text-gold/70">{subline}</div>}
+      </div>
     </div>
   );
 }
