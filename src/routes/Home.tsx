@@ -8,6 +8,7 @@ import { Shell } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const FLAGS = ["🇲🇽", "🇧🇷", "🇦🇷", "🇫🇷", "🇪🇸", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇵🇹", "🇳🇱", "🇺🇸", "🇨🇦", "🇯🇵"];
 
@@ -19,6 +20,7 @@ export default function Home() {
   const [prize, setPrize] = useState("");
   const [n, setN] = useState(10);
   const [file, setFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState("");
   const [assignMode, setAssignMode] = useState<"on_join" | "on_reveal">(
     "on_join",
   );
@@ -39,6 +41,7 @@ export default function Home() {
         assignMode,
         prizeMode,
         entryFee: prizeMode === "per_person" ? fee : undefined,
+        notes,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
     } finally {
@@ -232,6 +235,18 @@ export default function Home() {
                 );
               })}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="notes">Notas (opcional)</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Reglas, fecha límite de pago, sede…"
+              maxLength={1000}
+              rows={3}
+            />
           </div>
 
           <div className="flex flex-col gap-2">

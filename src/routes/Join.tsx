@@ -119,6 +119,15 @@ export default function Join() {
         })()}
       </header>
 
+      {quiniela.notes && (
+        <>
+          <SectionHeading>Notas</SectionHeading>
+          <div className="grain relative overflow-hidden rounded-2xl border border-border bg-card px-4 py-3 text-sm whitespace-pre-wrap text-foreground/90">
+            {quiniela.notes}
+          </div>
+        </>
+      )}
+
       {/* Players table */}
       {quiniela.assignMode === "on_reveal" && quiniela.status === "open" && (
         <div className="grain relative mt-6 flex items-center gap-2.5 overflow-hidden rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">

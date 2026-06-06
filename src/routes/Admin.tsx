@@ -7,6 +7,7 @@ import { Shell } from "@/components/Shell";
 import { SectionHeading } from "@/components/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyIcon, CheckIcon, LinkIcon } from "lucide-react";
 
@@ -28,6 +29,7 @@ export default function Admin() {
   const { id, token } = useParams();
   const data = useQuery(api.quinielas.getAdmin, { adminToken: token! });
   const close = useMutation(api.quinielas.closeAndRedistribute);
+  const saveNotes = useMutation(api.quinielas.updateNotes);
   const setResult = useMutation(api.matches.setMatchResultManual);
   const clearOverride = useMutation(api.matches.clearMatchOverride);
 
@@ -37,12 +39,18 @@ export default function Admin() {
   const [winners, setWinners] = useState<Record<string, "home" | "draw" | "away">>({});
   const [closing, setClosing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  // `null` significa "sin editar": el editor refleja las notas del servidor.
+  const [notesEdit, setNotesEdit] = useState<string | null>(null);
+  const [savingNotes, setSavingNotes] = useState(false);
 
   if (data === undefined) return <LoadingState />;
 
   const { quiniela } = data;
   const reveal = quiniela.assignMode === "on_reveal";
   const joinUrl = `${location.origin}/q/${id}/join/${data.quiniela.joinToken}`;
+  const savedNotes = quiniela.notes ?? "";
+  // Mientras no se edite, muestra lo que hay en el servidor.
+  const notesValue = notesEdit ?? savedNotes;
 
   const statusLabel =
     quiniela.status === "open"
@@ -69,6 +77,20 @@ export default function Admin() {
       toast.error(e instanceof Error ? e.message : "No se pudo cerrar");
     } finally {
       setClosing(false);
+    }
+  }
+
+  async function onSaveNotes() {
+    setSavingNotes(true);
+    try {
+      await saveNotes({ adminToken: token!, notes: notesValue });
+      // Vuelve a reflejar el servidor (la query ya trae las notas guardadas).
+      setNotesEdit(null);
+      toast.success("Notas guardadas");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudieron guardar las notas");
+    } finally {
+      setSavingNotes(false);
     }
   }
 
@@ -174,6 +196,26 @@ export default function Admin() {
         <p className="mt-2 text-[0.7rem] text-muted-foreground">
           Comparte este link para que cualquiera se inscriba.
         </p>
+      </div>
+
+      {/* Notes editor */}
+      <SectionHeading>Notas</SectionHeading>
+      <div className="grain relative overflow-hidden rounded-2xl border border-border bg-card p-4">
+        <Textarea
+          value={notesValue}
+          onChange={(e) => setNotesEdit(e.target.value)}
+          placeholder="Reglas, fecha límite de pago, sede… (visible para todos)"
+          maxLength={1000}
+          rows={3}
+        />
+        <Button
+          size="sm"
+          className="mt-2.5 rounded-lg"
+          disabled={savingNotes || notesValue === savedNotes}
+          onClick={() => void onSaveNotes()}
+        >
+          {savingNotes ? "Guardando…" : "Guardar notas"}
+        </Button>
       </div>
 
       {/* Close & redistribute */}
