@@ -20,7 +20,7 @@ describe("createQuiniela", () => {
     expect(res.quinielaId).toBeDefined();
     expect(res.adminToken).toHaveLength(64);
     expect(res.joinToken).toHaveLength(64);
-    const qn = await t.run((ctx) => ctx.db.get(res.quinielaId as any));
+    const qn = await t.run((ctx) => ctx.db.get(res.quinielaId));
     expect(qn!.slotSizes.reduce((a: number, b: number) => a + b, 0)).toBe(48);
     expect(qn!.status).toBe("open");
   });
@@ -37,10 +37,10 @@ describe("closeAndRedistribute", () => {
     }
     await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
     const owns = await t.run((ctx) =>
-      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId as any)).collect());
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
     expect(owns.length).toBe(48); // every team owned
     expect(new Set(owns.map((o) => o.teamId)).size).toBe(48);
-    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId as any));
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
     expect(qn!.status).toBe("locked");
   });
 });

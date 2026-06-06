@@ -1,6 +1,6 @@
 // convex/lib/distribution.test.ts
 import { describe, it, expect } from "vitest";
-import { computeSlotSizes, shuffleInPlace, drawN, balancedRedistribute } from "./distribution";
+import { computeSlotSizes, drawN, balancedRedistribute } from "./distribution";
 
 // deterministic RNG (mulberry32)
 function rng(seed: number) {

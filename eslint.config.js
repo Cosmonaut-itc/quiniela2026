@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Generated Convex code and static data snapshots are not hand-written.
+  globalIgnores(['dist', 'convex/_generated/**', 'convex/data/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -17,6 +18,15 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+    },
+  },
+  {
+    // Vendored shadcn/ui primitives intentionally export a component alongside
+    // their `cva` variants constant, which react-refresh flags. This is the
+    // canonical shadcn layout; do not split these files.
+    files: ['src/components/ui/**'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

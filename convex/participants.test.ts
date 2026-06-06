@@ -18,7 +18,7 @@ describe("joinQuiniela", () => {
     const res = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
     expect(res.personalToken).toHaveLength(64);
     const owns = await t.run((ctx) =>
-      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId as any)).collect());
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
     expect(owns.length).toBeGreaterThanOrEqual(4);
     expect(owns.length).toBeLessThanOrEqual(5);
     expect(new Set(owns.map((o) => o.teamId)).size).toBe(owns.length); // unique
@@ -29,7 +29,7 @@ describe("joinQuiniela", () => {
     await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "A" });
     await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "B" });
     const owns = await t.run((ctx) =>
-      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId as any)).collect());
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
     expect(new Set(owns.map((o) => o.teamId)).size).toBe(owns.length);
   });
 

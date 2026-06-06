@@ -131,7 +131,8 @@ export const getOverview = query({
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
-        numParticipants: qn.numParticipants, filledCount: participants.length, status: qn.status as any,
+        numParticipants: qn.numParticipants, filledCount: participants.length,
+        status: qn.status as "open" | "locked" | "finished",
       },
       players: await Promise.all(players.map(async (p) => ({
         participantId: p.participantId, name: p.name, photoUrl: await photoUrl(ctx, p.photoUrlId),
@@ -167,7 +168,8 @@ export const getAdmin = query({
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
-        numParticipants: qn.numParticipants, filledCount: participants.length, status: qn.status as any,
+        numParticipants: qn.numParticipants, filledCount: participants.length,
+        status: qn.status as "open" | "locked" | "finished",
         joinToken: qn.joinToken,
       },
       participants: participants.map((p) => ({
