@@ -205,6 +205,7 @@ export default function Admin() {
           value={notesValue}
           onChange={(e) => setNotesEdit(e.target.value)}
           placeholder="Reglas, fecha límite de pago, sede… (visible para todos)"
+          aria-label="Notas de la quiniela (visible para todos)"
           maxLength={1000}
           rows={3}
         />
