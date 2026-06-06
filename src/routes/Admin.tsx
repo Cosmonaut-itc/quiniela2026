@@ -45,6 +45,7 @@ export default function Admin() {
   // `null` significa "sin editar": el editor refleja las notas del servidor.
   const [notesEdit, setNotesEdit] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
 
   if (data === undefined) return <LoadingState />;
 
@@ -102,10 +103,13 @@ export default function Admin() {
   }
 
   async function onTogglePaid(participantId: string, paid: boolean) {
+    setTogglingPaidId(participantId);
     try {
       await setPaid({ adminToken: token!, participantId: participantId as Id<"participants">, paid });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo actualizar el pago");
+    } finally {
+      setTogglingPaidId(null);
     }
   }
 
@@ -267,7 +271,7 @@ export default function Admin() {
         </span>
       </SectionHeading>
       {perPerson && (
-        <div className="mb-2.5 rounded-2xl border border-gold/30 bg-card px-4 py-3 text-sm">
+        <div className="grain relative mb-2.5 overflow-hidden rounded-2xl border border-gold/30 bg-card px-4 py-3 text-sm">
           <div className="font-semibold text-gold">
             Bote confirmado: {formatMXN(quiniela.prize.pool ?? 0)}
           </div>
@@ -300,9 +304,10 @@ export default function Admin() {
                 <button
                   type="button"
                   onClick={() => void onTogglePaid(p.id, !p.paid)}
+                  disabled={togglingPaidId === p.id}
                   aria-pressed={p.paid}
                   className={
-                    "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors " +
+                    "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50 " +
                     (p.paid
                       ? "bg-alive/15 text-alive"
                       : "bg-muted/60 text-muted-foreground hover:text-foreground")
