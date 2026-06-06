@@ -12,6 +12,7 @@ import type * as lib_distribution from "../lib/distribution.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
 import type * as matches from "../matches.js";
+import type * as quinielas from "../quinielas.js";
 import type * as seed from "../seed.js";
 import type * as types from "../types.js";
 
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tokens": typeof lib_tokens;
   "lib/tournament": typeof lib_tournament;
   matches: typeof matches;
+  quinielas: typeof quinielas;
   seed: typeof seed;
   types: typeof types;
 }>;
