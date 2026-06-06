@@ -11,6 +11,7 @@
 import type * as crons from "../crons.js";
 import type * as lib_distribution from "../lib/distribution.js";
 import type * as lib_footballData from "../lib/footballData.js";
+import type * as lib_notify from "../lib/notify.js";
 import type * as lib_perQuiniela from "../lib/perQuiniela.js";
 import type * as lib_resolve from "../lib/resolve.js";
 import type * as lib_tokens from "../lib/tokens.js";
@@ -18,6 +19,7 @@ import type * as lib_tournament from "../lib/tournament.js";
 import type * as lib_view from "../lib/view.js";
 import type * as matches from "../matches.js";
 import type * as mundial from "../mundial.js";
+import type * as notifications from "../notifications.js";
 import type * as participants from "../participants.js";
 import type * as quinielas from "../quinielas.js";
 import type * as seed from "../seed.js";
@@ -34,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   "lib/distribution": typeof lib_distribution;
   "lib/footballData": typeof lib_footballData;
+  "lib/notify": typeof lib_notify;
   "lib/perQuiniela": typeof lib_perQuiniela;
   "lib/resolve": typeof lib_resolve;
   "lib/tokens": typeof lib_tokens;
@@ -41,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "lib/view": typeof lib_view;
   matches: typeof matches;
   mundial: typeof mundial;
+  notifications: typeof notifications;
   participants: typeof participants;
   quinielas: typeof quinielas;
   seed: typeof seed;
