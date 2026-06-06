@@ -69,3 +69,8 @@ export type AdminData = {
 };
 
 export type TeamLite = { code: string; name: string; flag: string; group: string };
+
+export type NotificationItem = {
+  id: string; type: string; title: string; body: string; createdAt: number; read: boolean;
+};
+export type NotificationsData = { items: NotificationItem[]; unreadCount: number };

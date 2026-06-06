@@ -92,4 +92,23 @@ export default defineSchema({
   })
     .index("by_quiniela", ["quinielaId"])
     .index("by_quiniela_match", ["quinielaId", "matchId"]),
+
+  // Avisos persistidos (in-app; en Fase 2 también disparan push). Una fila por aviso.
+  // `dedupeKey` garantiza emite-una-vez: la detección por cron solo inserta si no existe.
+  notifications: defineTable({
+    quinielaId: v.id("quinielas"),
+    audience: v.string(), // "participant" | "admin"
+    participantId: v.optional(v.id("participants")),
+    type: v.string(),
+    title: v.string(),
+    body: v.string(),
+    matchId: v.optional(v.id("matches")),
+    teamId: v.optional(v.id("teams")),
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),
+    dedupeKey: v.string(),
+  })
+    .index("by_participant", ["participantId", "createdAt"])
+    .index("by_quiniela_audience", ["quinielaId", "audience", "createdAt"])
+    .index("by_dedupe", ["dedupeKey"]),
 });
