@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as lib_distribution from "../lib/distribution.js";
 import type * as lib_tokens from "../lib/tokens.js";
+import type * as lib_tournament from "../lib/tournament.js";
 import type * as types from "../types.js";
 
 import type {
@@ -18,7 +20,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "lib/distribution": typeof lib_distribution;
   "lib/tokens": typeof lib_tokens;
+  "lib/tournament": typeof lib_tournament;
   types: typeof types;
 }>;
 
