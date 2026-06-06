@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 // convex-test cannot auto-discover function modules under Vite; pass the
 // module map explicitly (the documented edge-runtime pattern).
@@ -34,5 +34,67 @@ describe("seed + recompute", () => {
       ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", gm!.externalId)).first());
     expect(updated!.homeScore).toBe(2);
     expect(updated!.status).toBe("finished");
+  });
+
+  it("a knockout penalty draw eliminates the loser via explicit winnerExternalId", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    // pick a knockout match (TBD teams in the snapshot) and assign two real seeded teams
+    const km = await t.run((ctx) =>
+      ctx.db.query("matches").filter((q) => q.neq(q.field("stage"), "group")).first());
+    const externalId = km!.externalId;
+    // two real seeded teams: 758 (Uruguay) home, 759 (Germany) away
+    await t.mutation(internal.matches.upsertMatchResult, {
+      match: { externalId, stage: km!.stage, group: null,
+        homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+        homeScore: null, awayScore: null, status: "scheduled",
+        winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null },
+    });
+    // finish it 1-1 but the away team wins on penalties (explicit winner)
+    await t.mutation(internal.matches.upsertMatchResult, {
+      match: { externalId, stage: km!.stage, group: null,
+        homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+        homeScore: 1, awayScore: 1, status: "finished",
+        winnerExternalId: "759", bracketSlot: km!.bracketSlot ?? null },
+    });
+    await t.mutation(internal.matches.recomputeTeamStates, {});
+
+    const loser = await t.run((ctx) =>
+      ctx.db.query("teams").withIndex("by_externalId", (q) => q.eq("externalId", "758")).first());
+    const winner = await t.run((ctx) =>
+      ctx.db.query("teams").withIndex("by_externalId", (q) => q.eq("externalId", "759")).first());
+    expect(loser!.alive).toBe(false); // eliminated despite the equal score
+    expect(winner!.alive).toBe(true);
+
+    const stored = await t.run((ctx) =>
+      ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", externalId)).first());
+    expect(stored!.winnerTeamId).toBe(winner!._id);
+  });
+
+  it("setMatchResultManual uses an explicit winnerExternalId on a tied knockout", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const km = await t.run((ctx) =>
+      ctx.db.query("matches").filter((q) => q.neq(q.field("stage"), "group")).first());
+    const externalId = km!.externalId;
+    // assign two real seeded teams so the match has resolvable home/away
+    await t.mutation(internal.matches.upsertMatchResult, {
+      match: { externalId, stage: km!.stage, group: null,
+        homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+        homeScore: null, awayScore: null, status: "scheduled",
+        winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null },
+    });
+    // create a quiniela so we have a valid adminToken
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    await t.mutation(api.matches.setMatchResultManual, {
+      adminToken: q.adminToken, matchExternalId: externalId,
+      homeScore: 1, awayScore: 1, finished: true, winnerExternalId: "759",
+    });
+    const winner = await t.run((ctx) =>
+      ctx.db.query("teams").withIndex("by_externalId", (q) => q.eq("externalId", "759")).first());
+    const stored = await t.run((ctx) =>
+      ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", externalId)).first());
+    expect(stored!.winnerTeamId).toBe(winner!._id); // explicit winner wins over the tie
+    expect(stored!.manualOverride).toBe(true);
   });
 });

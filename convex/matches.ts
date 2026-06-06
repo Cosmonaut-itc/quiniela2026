@@ -15,6 +15,7 @@ const apiMatch = v.object({
   homeScore: v.union(v.number(), v.null()),
   awayScore: v.union(v.number(), v.null()),
   status: v.string(),
+  winnerExternalId: v.optional(v.union(v.string(), v.null())),
   bracketSlot: v.union(v.string(), v.null()),
 });
 
@@ -33,7 +34,9 @@ function winnerOf(
   if (hs == null || as == null) return undefined;
   if (hs > as) return homeId;
   if (as > hs) return awayId;
-  return undefined; // draws resolved by API via explicit winner in knockout; group draws have no winner
+  // Score-based fallback only: an equal score yields no winner here. The authoritative
+  // knockout winner (incl. extra time / penalties) comes from match.winnerExternalId.
+  return undefined;
 }
 
 export const upsertMatchResult = internalMutation({
@@ -45,8 +48,14 @@ export const upsertMatchResult = internalMutation({
 
     const homeTeamId = (await teamIdByExternal(ctx, match.homeExternalId)) ?? existing?.homeTeamId;
     const awayTeamId = (await teamIdByExternal(ctx, match.awayExternalId)) ?? existing?.awayTeamId;
+    // Prefer the API's explicit winner (covers ET/penalties where scores are equal);
+    // fall back to the score-derived winner only when no explicit winner is given.
     const winnerTeamId =
-      match.status === "finished" ? winnerOf(homeTeamId, awayTeamId, match.homeScore, match.awayScore) : undefined;
+      match.status !== "finished"
+        ? undefined
+        : typeof match.winnerExternalId === "string"
+          ? await teamIdByExternal(ctx, match.winnerExternalId)
+          : winnerOf(homeTeamId, awayTeamId, match.homeScore, match.awayScore);
 
     const fields = {
       stage: match.stage,
@@ -101,13 +110,17 @@ export const recomputeTeamStates = internalMutation({
 
 export const setMatchResultManual = mutation({
   args: { adminToken: v.string(), matchExternalId: v.string(),
-          homeScore: v.number(), awayScore: v.number(), finished: v.boolean() },
+          homeScore: v.number(), awayScore: v.number(), finished: v.boolean(),
+          winnerExternalId: v.optional(v.union(v.string(), v.null())) },
   handler: async (ctx, args) => {
     const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
     if (!qn) throw new Error("Quiniela no encontrada");
     const match = await ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId)).first();
     if (!match) throw new Error("Partido no encontrado");
+    // An explicit winner lets an admin resolve a tied knockout (penalties / extra time);
+    // otherwise fall back to the score (home>away→home, away>home→away, tie→none).
     const winnerTeamId = !args.finished ? undefined
+      : typeof args.winnerExternalId === "string" ? await teamIdByExternal(ctx, args.winnerExternalId)
       : args.homeScore > args.awayScore ? match.homeTeamId
       : args.awayScore > args.homeScore ? match.awayTeamId : undefined;
     await ctx.db.patch(match._id, {
