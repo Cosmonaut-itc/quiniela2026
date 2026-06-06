@@ -103,6 +103,7 @@ export const getPersonalPanel = query({
 
     return {
       quinielaId: qn._id as string, quinielaName: qn.name, prizeText: qn.prizeText,
+      joinToken: qn.joinToken,
       me: { name: me.name, photoUrl: await photoUrl(ctx, me.photoId), status, aliveCount, totalCount: teamsOut.length },
       playingNow,
       teams: teamsOut,

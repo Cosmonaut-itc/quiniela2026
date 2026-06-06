@@ -47,7 +47,14 @@ export default function Personal() {
 
   return (
     <Shell
-      bottomNav={<BottomNav id={id!} active="me" meToken={token} />}
+      bottomNav={
+        <BottomNav
+          id={id!}
+          active="me"
+          meToken={token}
+          joinToken={data.joinToken}
+        />
+      }
     >
       {/* Header */}
       <header className="grain bg-pitch relative -mx-4 -mt-5 overflow-hidden rounded-b-3xl border-b border-border px-4 pt-8 pb-6">

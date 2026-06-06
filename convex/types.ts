@@ -15,6 +15,7 @@ export type PersonalData = {
   quinielaId: string;
   quinielaName: string;
   prizeText: string;
+  joinToken: string;
   me: { name: string; photoUrl: string | null; status: PlayerStatus;
         aliveCount: number; totalCount: number };
   playingNow: { myTeam: TeamLite; opponent: TeamLite; opponentOwner: string;
