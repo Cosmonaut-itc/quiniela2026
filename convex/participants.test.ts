@@ -41,3 +41,17 @@ describe("joinQuiniela", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("getPersonalPanel", () => {
+  it("returns my teams with next opponent and owner", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Beto" });
+    const panel = await t.query(api.participants.getPersonalPanel, { personalToken: a.personalToken });
+    expect(panel.me.name).toBe("Ana");
+    expect(panel.teams.length).toBeGreaterThan(0);
+    expect(panel.me.status).toBe("alive");
+  });
+});
