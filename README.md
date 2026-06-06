@@ -207,17 +207,3 @@ railway domain --service quiniela2026
 
 También puedes hacerlo desde el dashboard de Railway: nuevo servicio desde el repo de GitHub,
 agregar las dos variables y desplegar.
-
----
-
-## 🧪 Calidad
-
-- **47 pruebas** (lógica de reparto y torneo, mutaciones/queries vía convex‑test — incluyendo el
-  **aislamiento de overrides entre quinielas**, campeón por quiniela y la independencia del cron —,
-  mapeo de la API, smoke de componentes).
-- `npm run lint` en limpio (0 errores).
-- Validado en navegador con Playwright (incluido el aislamiento A↔B y el revert) y revisado con CodeRabbit.
-
----
-
-Diseño e implementación documentados en `docs/superpowers/`.
