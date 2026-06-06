@@ -34,6 +34,10 @@ describe("seed + recompute", () => {
       ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", gm!.externalId)).first());
     expect(updated!.homeScore).toBe(2);
     expect(updated!.status).toBe("finished");
+    // passing null externalIds on an existing match must PRESERVE the seeded teams,
+    // not overwrite them with null (the `?? existing?.homeTeamId` fallback in upsertMatchResult)
+    expect(updated!.homeTeamId).toBe(gm!.homeTeamId);
+    expect(updated!.awayTeamId).toBe(gm!.awayTeamId);
   });
 
   it("a knockout penalty draw eliminates the loser via explicit winnerExternalId", async () => {
