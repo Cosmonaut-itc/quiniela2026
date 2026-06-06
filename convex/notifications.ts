@@ -39,19 +39,6 @@ const toItem = (n: Doc<"notifications">): NotificationItem => ({
 
 export const listForParticipant = query({
   args: { personalToken: v.string() },
-  returns: v.object({
-    items: v.array(
-      v.object({
-        id: v.string(),
-        type: v.string(),
-        title: v.string(),
-        body: v.string(),
-        createdAt: v.number(),
-        read: v.boolean(),
-      }),
-    ),
-    unreadCount: v.number(),
-  }),
   handler: async (ctx, args): Promise<NotificationsData> => {
     const me = await ctx.db
       .query("participants")
@@ -72,19 +59,6 @@ export const listForParticipant = query({
 
 export const listForAdmin = query({
   args: { adminToken: v.string() },
-  returns: v.object({
-    items: v.array(
-      v.object({
-        id: v.string(),
-        type: v.string(),
-        title: v.string(),
-        body: v.string(),
-        createdAt: v.number(),
-        read: v.boolean(),
-      }),
-    ),
-    unreadCount: v.number(),
-  }),
   handler: async (ctx, args): Promise<NotificationsData> => {
     const qn = await ctx.db
       .query("quinielas")
@@ -110,7 +84,6 @@ export const markRead = mutation({
     personalToken: v.optional(v.string()),
     adminToken: v.optional(v.string()),
   },
-  returns: v.object({ ok: v.literal(true) }),
   handler: async (ctx, args) => {
     const now = Date.now();
     let rows: Doc<"notifications">[];
