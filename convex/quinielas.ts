@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
 import { teamLite, photoUrl } from "./lib/view";
-import type { OverviewData, PlayerStatus } from "./types";
+import type { OverviewData, PlayerStatus, AdminData } from "./types";
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -117,6 +117,42 @@ export const getOverview = query({
         awayOwner: nameById.get(ownerByTeam.get(mt.awayTeamId!)!) ?? "",
         awayTeam: teamLite(teamById.get(mt.awayTeamId!))!,
         kickoffAt: mt.kickoffAt,
+      })),
+    };
+  },
+});
+
+export const getAdmin = query({
+  args: { adminToken: v.string() },
+  handler: async (ctx, args): Promise<AdminData> => {
+    const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const teams = await ctx.db.query("teams").collect();
+    const teamById = new Map(teams.map((t) => [t._id, t]));
+    const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+    const ownerships = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+    const matches = (await ctx.db.query("matches").withIndex("by_kickoff").collect());
+
+    const STAGE_LABEL: Record<string, string> = {
+      group: "Grupos", r32: "Dieciseisavos", r16: "Octavos", qf: "Cuartos",
+      sf: "Semis", third: "3er lugar", final: "Final",
+    };
+    return {
+      quiniela: {
+        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
+        numParticipants: qn.numParticipants, filledCount: participants.length, status: qn.status as any,
+        joinToken: qn.joinToken,
+      },
+      participants: participants.map((p) => ({
+        name: p.name, personalToken: p.personalToken,
+        teamCount: ownerships.filter((o) => o.participantId === p._id).length,
+      })),
+      matches: matches.map((mt) => ({
+        externalId: mt.externalId, stage: mt.stage, label: STAGE_LABEL[mt.stage] ?? mt.stage,
+        homeTeam: mt.homeTeamId ? teamLite(teamById.get(mt.homeTeamId)) : null,
+        awayTeam: mt.awayTeamId ? teamLite(teamById.get(mt.awayTeamId)) : null,
+        homeScore: mt.homeScore ?? null, awayScore: mt.awayScore ?? null,
+        status: mt.status, manualOverride: mt.manualOverride,
       })),
     };
   },

@@ -58,3 +58,17 @@ describe("getOverview", () => {
     expect(ov.freeSlots).toBe(3);
   });
 });
+
+describe("getAdmin", () => {
+  it("returns participants with team counts and the match list", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(admin.participants).toHaveLength(1);
+    expect(admin.participants[0].teamCount).toBeGreaterThan(0);
+    expect(admin.matches.length).toBe(104);
+    expect(admin.quiniela.joinToken).toBe(q.joinToken);
+  });
+});
