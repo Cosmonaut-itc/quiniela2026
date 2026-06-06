@@ -8,7 +8,7 @@ entre sí. Un equipo queda eliminado cuando sale del torneo; quedas descalificad
 (*winner‑take‑all*).
 
 - **App en vivo:** https://quiniela2026-production-b5aa.up.railway.app
-- Mobile‑first, en español. Resultados **automáticos** vía API de fútbol + corrección manual del admin.
+- Mobile‑first, en español. Resultados **automáticos** vía API de fútbol + corrección manual del admin **por quiniela** (aislada del resto).
 
 ---
 
@@ -16,19 +16,21 @@ entre sí. Un equipo queda eliminado cuando sale del torneo; quedas descalificad
 
 Hay **dos capas de datos** en Convex:
 
-- **Capa global (compartida):** equipos, partidos, quién sigue vivo, quién es campeón. Se
-  sincroniza una sola vez desde la API y sirve a todas las quinielas.
-- **Capa por quiniela:** solo la "dueñería" (qué equipos le tocan a cada quien).
+- **Capa global (verdad de la API):** equipos y partidos, sincronizados desde la API de fútbol.
+  Es la base que ven todas las quinielas.
+- **Capa por quiniela:** la "dueñería" (qué equipos le tocan a cada quien) y los **overrides de
+  marcador** — correcciones del admin que aplican **solo a esa quiniela**.
 
-Toda la derivación (próximo rival, eliminados, standings, duelos, campeón) ocurre en **queries
-reactivas de Convex** que devuelven datos listos para renderizar, así que React queda delgado y
-todos los dispositivos se actualizan solos.
+Toda la derivación (vivos/eliminados, standings, próximo rival, duelos, **campeón**) ocurre en
+**queries reactivas de Convex** que combinan los partidos globales con los overrides de cada
+quiniela y devuelven datos listos para renderizar. Así una corrección en una quiniela **nunca**
+afecta a las demás, React queda delgado y todos los dispositivos se actualizan solos.
 
 ### Enlaces (sin cuentas, basados en tokens)
 
 | Enlace | Ruta | Quién |
 |---|---|---|
-| **Admin** | `/q/:id/admin/:adminToken` | solo el creador (compartir, cerrar, corregir marcadores) |
+| **Admin** | `/q/:id/admin/:adminToken` | solo el creador (compartir, cerrar/repartir, corregir y revertir marcadores) |
 | **Invitar / Ver** | `/q/:id/join/:joinToken` | se comparte; muestra la quiniela y permite unirse |
 | **Personal** | `/q/:id/me/:personalToken` | panel privado de cada jugador |
 | **Mundial** | `/q/:id/mundial` | grupos + bracket con el dueño de cada equipo (público) |
@@ -38,12 +40,18 @@ link, el admin se lo reenvía desde su panel.
 
 ### Flujo
 
-1. **Crear** → nombre, premio (texto libre), número de participantes (2–48), foto opcional.
-2. **Unirse** → nombre + foto → reparto **aleatorio instantáneo** de equipos sin dueño.
-3. **Cerrar y repartir** → el admin (o el auto‑cierre al primer partido) reparte los equipos de
-   los lugares vacíos al participante con menos equipos → los 48 siempre tienen dueño.
-4. **Sincronizar** → un cron consulta la API cada 5 min, actualiza marcadores, calcula
-   eliminaciones y campeón. El admin puede corregir un marcador a mano (gana sobre la API).
+1. **Crear** → nombre, premio (texto libre), participantes (2–48), foto opcional y **modo de
+   reparto**: *al unirse* (cada quien recibe sus equipos al inscribirse) o *sorteo en vivo*
+   (nadie recibe equipos hasta que el admin da click en "Repartir").
+2. **Unirse** → nombre + foto → en modo *al unirse*, reparto **aleatorio instantáneo** de equipos
+   sin dueño; en *sorteo en vivo* el jugador queda "en espera" hasta el reparto.
+3. **Cerrar y repartir** → el admin (o el auto‑cierre al primer partido, solo en modo *al unirse*)
+   reparte los equipos de los lugares vacíos al participante con menos equipos → los 48 siempre
+   tienen dueño.
+4. **Sincronizar** → un cron consulta la API cada 5 min, actualiza marcadores y recalcula
+   vivos/campeón. El admin puede **corregir un marcador a mano para su quiniela** (gana sobre la
+   API solo ahí, con selector de ganador para empates de eliminatoria) y **revertirlo** al
+   resultado automático cuando quiera — sin afectar a ninguna otra quiniela.
 
 ---
 
@@ -61,16 +69,17 @@ link, el admin se lo reenvía desde su panel.
 
 ```
 convex/                     # Backend (Convex)
-  schema.ts                 # teams, matches, quinielas, participants, ownerships + índices
+  schema.ts                 # teams, matches, quinielas, participants, ownerships, matchOverrides + índices
   types.ts                  # formas de retorno compartidas (también las usa el frontend)
   quinielas.ts              # createQuiniela, getOverview, getAdmin, closeAndRedistribute, autoCloseDue, generateUploadUrl
   participants.ts           # joinQuiniela, getPersonalPanel
   mundial.ts                # getMundial (grupos + bracket)
-  matches.ts                # setMatchResultManual (admin) + upsert/recompute (internas)
+  matches.ts                # setMatchResultManual + clearMatchOverride (admin, por quiniela) + upsert/recompute (internas)
   seed.ts                   # seedFromSnapshot (interna)
   sync.ts                   # syncMatches (internalAction, consulta la API)
   crons.ts                  # cron de sincronización cada 5 min
-  lib/                      # módulos puros: distribution, tournament, footballData, view, tokens
+  lib/                      # módulos puros: distribution, tournament, footballData, view, tokens,
+                            #   resolve + perQuiniela (derivación de overrides por quiniela)
   data/wc2026-snapshot.json # 48 equipos + 104 partidos (semilla offline + fixture de pruebas)
 src/                        # Frontend (React)
   routes/                   # Home, Join, Personal, Mundial, Admin
@@ -159,8 +168,10 @@ npx convex run sync:syncMatches '{}' --prod     # opcional: trae el estado actua
 ```
 
 A partir de ahí, el **cron `syncMatches` corre cada 5 minutos** automáticamente: hace upsert de
-los partidos por `externalId` (respetando las correcciones manuales), recalcula vivos/eliminados/
-campeón y auto‑cierra las quinielas al arrancar el primer partido.
+los partidos por `externalId` (el partido global **siempre sigue la API**; las correcciones del
+admin viven por quiniela en `matchOverrides`), recalcula el estado global de equipos y auto‑cierra
+las quinielas (modo *al unirse*) al arrancar el primer partido. Vivos y campeón de cada quiniela
+se **derivan en lectura** combinando lo global con sus overrides.
 
 Guarda la URL de producción (algo como `https://<nombre>.convex.cloud`): es el valor de
 `VITE_CONVEX_URL` para Railway.
@@ -201,15 +212,22 @@ agregar las dos variables y desplegar.
 
 ## 🧪 Calidad
 
-- **28 pruebas** (lógica de reparto y torneo, mutaciones/queries vía convex‑test, mapeo de la API, smoke de componentes).
+- **47 pruebas** (lógica de reparto y torneo, mutaciones/queries vía convex‑test — incluyendo el
+  **aislamiento de overrides entre quinielas**, campeón por quiniela y la independencia del cron —,
+  mapeo de la API, smoke de componentes).
 - `npm run lint` en limpio (0 errores).
-- Validado en navegador con Playwright (todos los roles) y revisado con CodeRabbit.
+- Validado en navegador con Playwright (incluido el aislamiento A↔B y el revert) y revisado con CodeRabbit.
 
-## ⚠️ Limitación conocida
+## ✅ Correcciones aisladas por quiniela (v1.5)
 
-La corrección manual de marcador edita la fila **global** del partido, así que en un deployment
-que aloje muchas quinielas afectaría a todas. Está bien para un despliegue de una sola familia;
-los overrides por quiniela quedan para una v1.5.
+> *Antes (v1.0):* la corrección manual editaba la fila **global** del partido, así que en un
+> deployment con varias quinielas afectaba a **todas**.
+
+Ahora cada corrección se guarda como un **override por quiniela** (tabla `matchOverrides`): el
+`matches` global vuelve a ser **verdad‑API pura** y cada quiniela deriva sus vivos/campeón
+combinando los partidos globales con sus propios overrides. Una corrección **nunca** se filtra a
+otras quinielas, se puede **revertir** al resultado automático, e incluye **selector de ganador**
+para empates de eliminatoria (penales/prórroga).
 
 ---
 
