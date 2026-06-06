@@ -21,8 +21,8 @@ export const syncMatches = internalAction({
       await ctx.runMutation(internal.matches.recomputeTeamStates, {});
       await ctx.runMutation(internal.quinielas.autoCloseDue, {});
       return { ok: true };
-    } catch (e: any) {
-      return { ok: false, error: String(e?.message ?? e) };
+    } catch (e) {
+      return { ok: false, error: String(e instanceof Error ? e.message : e) };
     }
   },
 });

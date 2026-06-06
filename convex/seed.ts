@@ -1,5 +1,6 @@
 // convex/seed.ts
 import { internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import snapshot from "./data/wc2026-snapshot.json";
 
 export const seedFromSnapshot = internalMutation({
@@ -8,7 +9,7 @@ export const seedFromSnapshot = internalMutation({
     const existing = await ctx.db.query("teams").first();
     if (existing) return { teams: 0, matches: 0 };
 
-    const idByExternal = new Map<string, any>();
+    const idByExternal = new Map<string, Id<"teams">>();
     for (const tm of snapshot.teams) {
       const id = await ctx.db.insert("teams", {
         code: tm.code, name: tm.name, flag: tm.flag, group: tm.group,

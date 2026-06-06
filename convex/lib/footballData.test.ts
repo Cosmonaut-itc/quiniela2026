@@ -33,4 +33,16 @@ describe("mapMatches", () => {
     expect(out[0].awayScore).toBe(1);
     expect(out[0].winnerExternalId).toBe("2"); // away wins on penalties
   });
+  it("numbers bracket slots per stage, not by global match index", () => {
+    const out = mapMatches({ matches: [
+      { id: 1, stage: "GROUP_STAGE", group: "GROUP_A", utcDate: "2026-06-11T16:00:00Z", status: "SCHEDULED", homeTeam: { id: 10 }, awayTeam: { id: 11 }, score: { fullTime: {} } },
+      { id: 2, stage: "LAST_32", utcDate: "2026-06-28T16:00:00Z", status: "SCHEDULED", homeTeam: { id: null }, awayTeam: { id: null }, score: { fullTime: {} } },
+      { id: 3, stage: "LAST_32", utcDate: "2026-06-28T20:00:00Z", status: "SCHEDULED", homeTeam: { id: null }, awayTeam: { id: null }, score: { fullTime: {} } },
+      { id: 4, stage: "FINAL", utcDate: "2026-07-19T19:00:00Z", status: "SCHEDULED", homeTeam: { id: null }, awayTeam: { id: null }, score: { fullTime: {} } },
+    ] });
+    expect(out[0].bracketSlot).toBeNull(); // group has no slot
+    expect(out[1].bracketSlot).toBe("r32-1"); // per-stage 1-based, not global index 1
+    expect(out[2].bracketSlot).toBe("r32-2"); // not global index 2
+    expect(out[3].bracketSlot).toBe("final-1"); // first (and only) final, not global index 3
+  });
 });

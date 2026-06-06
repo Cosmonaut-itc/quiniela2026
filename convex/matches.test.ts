@@ -19,7 +19,7 @@ describe("seed + recompute", () => {
     expect(teams.every((x) => x.alive)).toBe(true);
   });
 
-  it("upsertMatchResult records a score and recompute flips a knockout loser", async () => {
+  it("upsertMatchResult records a group match score", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.seedFromSnapshot, {});
     // pick any group match, finish it

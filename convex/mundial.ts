@@ -1,6 +1,7 @@
 // convex/mundial.ts
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { teamLite, photoUrl } from "./lib/view";
 import { computeGroupStandings } from "./lib/tournament";
 import type { MundialData } from "./types";
@@ -25,9 +26,9 @@ export const getMundial = query({
     const nameById = new Map(participants.map((p) => [p._id, p]));
     const ownerByTeam = new Map(ownerships.map((o) => [o.teamId, o.participantId]));
 
-    const ownerName = (teamId?: string | null) => {
-      const tid = teamId as any;
-      return teamId && ownerByTeam.has(tid) ? nameById.get(ownerByTeam.get(tid)!)?.name ?? "—" : "Sin dueño";
+    const ownerName = (teamId?: Id<"teams"> | string | null) => {
+      const tid = teamId as Id<"teams"> | null | undefined;
+      return tid && ownerByTeam.has(tid) ? nameById.get(ownerByTeam.get(tid)!)?.name ?? "—" : "Sin dueño";
     };
 
     const teamRows = teams.map((t) => ({ _id: t._id as string, group: t.group }));
@@ -40,13 +41,14 @@ export const getMundial = query({
 
     const groupLetters = [...new Set(teams.map((t) => t.group))].sort();
     const groups = await Promise.all(groupLetters.map(async (g) => {
-      const standings = computeGroupStandings(g, teamRows as any, matchRows as any);
+      const standings = computeGroupStandings(g, teamRows, matchRows);
       const rows = await Promise.all(standings.map(async (s) => {
-        const tm = teamById.get(s.teamId as any)!;
-        const ownerId = ownerByTeam.get(s.teamId as any);
+        const teamId = s.teamId as Id<"teams">;
+        const tm = teamById.get(teamId)!;
+        const ownerId = ownerByTeam.get(teamId);
         return {
           team: teamLite(tm)!, points: s.points, gd: s.gd, gf: s.gf,
-          ownerName: ownerName(s.teamId), alive: tm.alive,
+          ownerName: ownerName(teamId), alive: tm.alive,
           ownerPhotoUrl: ownerId ? await photoUrl(ctx, nameById.get(ownerId)?.photoId) : null,
         };
       }));
