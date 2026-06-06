@@ -41,6 +41,7 @@ export default defineSchema({
     prizeText: v.string(),
     prizeMode: v.optional(v.string()), // "fixed" | "per_person"; ausente = "fixed" (legacy)
     entryFee: v.optional(v.number()),  // solo per_person; entero >= 1 (pesos)
+    notes: v.optional(v.string()), // texto libre del admin; ausente/"" = sin notas
     numParticipants: v.number(),
     slotSizes: v.array(v.number()),
     adminToken: v.string(),

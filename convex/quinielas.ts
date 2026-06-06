@@ -53,6 +53,7 @@ export const createQuiniela = mutation({
     assignMode: v.optional(v.string()), // "on_join" | "on_reveal"
     prizeMode: v.optional(v.string()),  // "fixed" | "per_person"
     entryFee: v.optional(v.number()),   // requerido en per_person
+    notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const n = Math.max(1, Math.min(48, Math.floor(args.numParticipants)));
@@ -61,6 +62,7 @@ export const createQuiniela = mutation({
     const joinToken = newToken();
     const perPerson = args.prizeMode === "per_person";
     const entryFee = perPerson ? Math.max(1, Math.floor(args.entryFee ?? 0)) : undefined;
+    const notes = (args.notes ?? "").trim().slice(0, 1000);
     const quinielaId = await ctx.db.insert("quinielas", {
       name: args.name.trim().slice(0, 60),
       prizeText: perPerson ? "" : args.prizeText.trim().slice(0, 60),
@@ -73,9 +75,21 @@ export const createQuiniela = mutation({
       status: "open",
       assignMode: args.assignMode === "on_reveal" ? "on_reveal" : "on_join",
       photoId: args.photoId,
+      notes: notes || undefined,
       createdAt: Date.now(),
     });
     return { quinielaId, adminToken, joinToken };
+  },
+});
+
+export const updateNotes = mutation({
+  args: { adminToken: v.string(), notes: v.string() },
+  handler: async (ctx, args) => {
+    const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const notes = args.notes.trim().slice(0, 1000);
+    await ctx.db.patch(qn._id, { notes: notes || undefined });
+    return { ok: true as const };
   },
 });
 
@@ -153,6 +167,7 @@ export const getOverview = query({
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         assignMode: modeOf(qn),
+        notes: qn.notes ?? null,
       },
       players: await Promise.all(players.map(async (p) => ({
         participantId: p.participantId, name: p.name, photoUrl: await photoUrl(ctx, p.photoUrlId),
@@ -193,6 +208,7 @@ export const getAdmin = query({
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         joinToken: qn.joinToken, assignMode: modeOf(qn),
+        notes: qn.notes ?? null,
       },
       participants: participants.map((p) => ({
         name: p.name, personalToken: p.personalToken,

@@ -22,7 +22,7 @@ export type PrizeView = {
 export type OverviewData = {
   quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
-              assignMode: AssignMode };
+              assignMode: AssignMode; notes: string | null };
   players: { participantId: string; name: string; photoUrl: string | null;
              aliveCount: number; totalCount: number; status: PlayerStatus }[];
   freeSlots: number;
@@ -59,7 +59,7 @@ export type MundialData = {
 export type AdminData = {
   quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
-              joinToken: string; assignMode: AssignMode };
+              joinToken: string; assignMode: AssignMode; notes: string | null };
   participants: { name: string; personalToken: string; teamCount: number }[];
   matches: { externalId: string; stage: string; label: string;
              homeTeam: TeamLite | null; awayTeam: TeamLite | null;

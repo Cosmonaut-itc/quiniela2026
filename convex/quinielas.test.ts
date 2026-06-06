@@ -210,3 +210,44 @@ describe("getOverview prize", () => {
     expect(ov.quiniela.prize.pool).toBeNull();
   });
 });
+
+describe("notes", () => {
+  it("stores trimmed notes on create and omits empty notes", async () => {
+    const t = await seeded();
+    const withNotes = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Con notas", prizeText: "$1", numParticipants: 4, notes: "  Pagar antes del viernes  ",
+    });
+    const blank = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Sin notas", prizeText: "$1", numParticipants: 4, notes: "   ",
+    });
+    const a = await t.run((ctx) => ctx.db.get(withNotes.quinielaId));
+    const b = await t.run((ctx) => ctx.db.get(blank.quinielaId));
+    expect(a!.notes).toBe("Pagar antes del viernes");
+    expect(b!.notes).toBeUndefined();
+  });
+
+  it("updateNotes edits and clears, and rejects a bad adminToken", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4 });
+    await t.mutation(api.quinielas.updateNotes, { adminToken: q.adminToken, notes: "  Sede: casa de Ana  " });
+    let qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.notes).toBe("Sede: casa de Ana");
+    await t.mutation(api.quinielas.updateNotes, { adminToken: q.adminToken, notes: "" });
+    qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.notes).toBeUndefined();
+    await expect(
+      t.mutation(api.quinielas.updateNotes, { adminToken: "no-existe", notes: "x" }),
+    ).rejects.toThrow();
+  });
+
+  it("exposes notes in getOverview and getAdmin", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "F", prizeText: "$1", numParticipants: 4, notes: "Reglas aquí",
+    });
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(ov.quiniela.notes).toBe("Reglas aquí");
+    expect(admin.quiniela.notes).toBe("Reglas aquí");
+  });
+});
