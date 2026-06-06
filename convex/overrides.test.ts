@@ -114,4 +114,44 @@ describe("overrides por quiniela", () => {
     const gm = await t.run((ctx) => ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", ext)).first());
     expect(gm!.winnerTeamId).toBe(t758!._id); // la final global sigue ganada por 758
   });
+
+  it("recomputeTeamStates ya NO finaliza el campeón de ninguna quiniela (se deriva en lectura)", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const fm = await t.run((ctx) => ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "final")).first());
+    await t.mutation(internal.matches.upsertMatchResult, {
+      match: { externalId: fm!.externalId, stage: "final", group: null, homeExternalId: "758", awayExternalId: "759",
+        kickoffAt: fm!.kickoffAt, homeScore: 2, awayScore: 0, status: "finished", winnerExternalId: "758", bracketSlot: fm!.bracketSlot ?? null } });
+    const a = await closedSolo(t, "A");
+    await t.mutation(internal.matches.recomputeTeamStates, {});
+    const qn = await t.run((ctx) => ctx.db.get(a.quinielaId));
+    expect(qn!.championParticipantId ?? null).toBeNull(); // recompute no escribe el campeón
+    expect(qn!.status).toBe("locked");                    // ni cambia el status a finished
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: a.joinToken });
+    expect(ov.quiniela.status).toBe("finished");          // pero la lectura SÍ deriva el campeón
+  });
+
+  it("INDEPENDENCIA DEL CRON: tras override en A, el cron actualiza el global y B lo ve; A conserva su override", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const ext = await assignKnockout(t);
+    const a = await closedSolo(t, "A"); const b = await closedSolo(t, "B");
+    await t.mutation(api.matches.setMatchResultManual, {
+      adminToken: a.adminToken, matchExternalId: ext, homeScore: 1, awayScore: 0, finished: true }); // 758 gana en A
+    // cron: la API dice que ganó 759 (0-2) → el global recomputa
+    const km = await t.run((ctx) => ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", ext)).first());
+    await t.mutation(internal.matches.upsertMatchResult, {
+      match: { externalId: ext, stage: km!.stage, group: null, homeExternalId: "758", awayExternalId: "759",
+        kickoffAt: km!.kickoffAt, homeScore: 0, awayScore: 2, status: "finished", winnerExternalId: "759", bracketSlot: km!.bracketSlot ?? null } });
+    await t.mutation(internal.matches.recomputeTeamStates, {});
+    const t758 = await teamByExt(t, "758"); const t759 = await teamByExt(t, "759");
+    const persB = await t.query(api.participants.getPersonalPanel, { personalToken: await personalTokenOf(t, b.quinielaId) });
+    const persA = await t.query(api.participants.getPersonalPanel, { personalToken: await personalTokenOf(t, a.quinielaId) });
+    // B sigue la API: 758 fuera (perdió 0-2), 759 vivo
+    expect(persB.teams.find((x) => x.team.code === t758!.code)!.alive).toBe(false);
+    expect(persB.teams.find((x) => x.team.code === t759!.code)!.alive).toBe(true);
+    // A conserva su override: 758 vivo, 759 fuera
+    expect(persA.teams.find((x) => x.team.code === t758!.code)!.alive).toBe(true);
+    expect(persA.teams.find((x) => x.team.code === t759!.code)!.alive).toBe(false);
+  });
 });

@@ -43,7 +43,8 @@ export const upsertMatchResult = internalMutation({
   handler: async (ctx, { match }) => {
     const existing = await ctx.db
       .query("matches").withIndex("by_externalId", (q) => q.eq("externalId", match.externalId)).first();
-    if (existing?.manualOverride) return; // never clobber a manual correction
+    // El partido global siempre sigue la API; las correcciones manuales viven por
+    // quiniela en matchOverrides, así que aquí ya no hay nada que respetar.
 
     const homeTeamId = (await teamIdByExternal(ctx, match.homeExternalId)) ?? existing?.homeTeamId;
     const awayTeamId = (await teamIdByExternal(ctx, match.awayExternalId)) ?? existing?.awayTeamId;
@@ -66,7 +67,6 @@ export const upsertMatchResult = internalMutation({
       status: match.status,
       winnerTeamId,
       externalId: match.externalId,
-      manualOverride: existing?.manualOverride ?? false,
       bracketSlot: match.bracketSlot ?? existing?.bracketSlot,
     };
     if (existing) await ctx.db.patch(existing._id, fields);
@@ -88,20 +88,14 @@ export const recomputeTeamStates = internalMutation({
         status: mt.status, winnerTeamId: mt.winnerTeamId ?? null, kickoffAt: mt.kickoffAt,
       })) as MatchRow[],
     );
+    // Baseline de la API: el estado global de equipos = lo que ve una quiniela SIN
+    // overrides. Las vistas por quiniela siempre derivan (resolveQuiniela), así que el
+    // campeón y el status "finished" se calculan por quiniela en lectura, no aquí: este
+    // recompute ya NO finaliza ninguna quiniela (eso cruzaba quinielas y era la fuga).
     for (const t of teams) {
       const s = states.get(t._id)!;
       if (t.alive !== s.alive || t.currentStage !== s.currentStage) {
         await ctx.db.patch(t._id, { alive: s.alive, currentStage: s.currentStage, eliminatedAt: s.eliminatedAt });
-      }
-    }
-    // finalize champion → quiniela winners
-    const champion = teams.find((t) => states.get(t._id)!.currentStage === "champion");
-    if (champion) {
-      const quinielas = await ctx.db.query("quinielas").withIndex("by_status", (q) => q.eq("status", "locked")).collect();
-      for (const qn of quinielas) {
-        const own = await ctx.db.query("ownerships")
-          .withIndex("by_quiniela_team", (q) => q.eq("quinielaId", qn._id).eq("teamId", champion._id)).first();
-        if (own) await ctx.db.patch(qn._id, { status: "finished", championParticipantId: own.participantId });
       }
     }
   },

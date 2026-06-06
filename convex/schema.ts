@@ -26,7 +26,9 @@ export default defineSchema({
     status: v.string(), // "scheduled" | "live" | "finished"
     winnerTeamId: v.optional(v.id("teams")),
     externalId: v.string(),
-    manualOverride: v.boolean(),
+    // DEPRECADO: las correcciones son por quiniela (matchOverrides); el global
+    // siempre sigue la API. Opcional para tolerar filas viejas; se suelta en limpieza futura.
+    manualOverride: v.optional(v.boolean()),
     bracketSlot: v.optional(v.string()),
   })
     .index("by_externalId", ["externalId"])

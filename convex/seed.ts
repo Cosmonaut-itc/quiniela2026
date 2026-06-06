@@ -28,7 +28,6 @@ export const seedFromSnapshot = internalMutation({
         awayScore: mt.awayScore ?? undefined,
         status: mt.status,
         externalId: mt.externalId,
-        manualOverride: false,
         bracketSlot: mt.bracketSlot ?? undefined,
       });
     }
