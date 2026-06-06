@@ -22,6 +22,8 @@ export default function Home() {
   const [assignMode, setAssignMode] = useState<"on_join" | "on_reveal">(
     "on_join",
   );
+  const [prizeMode, setPrizeMode] = useState<"fixed" | "per_person">("fixed");
+  const [fee, setFee] = useState(200);
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -31,10 +33,12 @@ export default function Home() {
       const photoId = file ? await upload(file) : undefined;
       const res = await create({
         name,
-        prizeText: prize,
+        prizeText: prizeMode === "per_person" ? "" : prize,
         numParticipants: n,
         photoId: photoId as Id<"_storage"> | undefined,
         assignMode,
+        prizeMode,
+        entryFee: prizeMode === "per_person" ? fee : undefined,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
     } finally {
@@ -42,7 +46,9 @@ export default function Home() {
     }
   }
 
-  const disabled = busy || uploading || !name.trim() || n < 2;
+  const disabled =
+    busy || uploading || !name.trim() || n < 2 ||
+    (prizeMode === "per_person" && fee < 1);
 
   return (
     <Shell className="flex min-h-svh flex-col justify-center">
@@ -87,18 +93,81 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="prize">Premio</Label>
-            <Input
-              id="prize"
-              value={prize}
-              onChange={(e) => setPrize(e.target.value)}
-              placeholder="$5,000 / La gloria eterna"
-              maxLength={60}
-            />
+            <Label>Premio</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    v: "fixed",
+                    title: "Premio fijo",
+                    sub: "Un monto o frase para el dueño del campeón.",
+                  },
+                  {
+                    v: "per_person",
+                    title: "Por participación 💰",
+                    sub: "Cuota por persona; el bote crece con cada quien entra.",
+                  },
+                ] as const
+              ).map((o) => {
+                const active = prizeMode === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setPrizeMode(o.v)}
+                    aria-pressed={active}
+                    className={
+                      "rounded-2xl border px-3 py-2.5 text-left transition-colors " +
+                      (active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-card text-muted-foreground hover:border-foreground/30")
+                    }
+                  >
+                    <div className="text-sm font-bold text-foreground">
+                      {o.title}
+                    </div>
+                    <div className="mt-0.5 text-[0.7rem] leading-snug">
+                      {o.sub}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {prizeMode === "fixed" ? (
+              <Input
+                id="prize"
+                value={prize}
+                onChange={(e) => setPrize(e.target.value)}
+                placeholder="$5,000 / La gloria eterna"
+                maxLength={60}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-muted-foreground">$</span>
+                <Input
+                  id="fee"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={fee}
+                  onChange={(e) =>
+                    setFee(Math.max(1, Math.floor(Number(e.target.value) || 0)))
+                  }
+                  placeholder="200"
+                />
+                <span className="text-sm whitespace-nowrap text-muted-foreground">
+                  por persona
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="n">Número de participantes</Label>
+            <Label htmlFor="n">
+              {prizeMode === "per_person"
+                ? "Máximo de participantes"
+                : "Número de participantes"}
+            </Label>
             <Input
               id="n"
               type="number"
@@ -116,7 +185,9 @@ export default function Home() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Entre 2 y 48 · los 48 equipos se reparten entre ustedes.
+              {prizeMode === "per_person"
+                ? "Tope de gente; el bote se arma con los que entren. Los 48 equipos se reparten entre ustedes."
+                : "Entre 2 y 48 · los 48 equipos se reparten entre ustedes."}
             </p>
           </div>
 
