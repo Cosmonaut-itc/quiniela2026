@@ -19,7 +19,6 @@ export type PrizeView = {
   contributors: number;    // filledCount (relevante en per_person).
 };
 
-
 export type OverviewData = {
   quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";

@@ -36,4 +36,8 @@ describe("prizeBanner", () => {
     expect(prizeBanner(perPerson(200, 8), "locked", " al campeón"))
       .toEqual({ title: "$1,600 al campeón", subline: "8 × $200" });
   });
+  it("per_person finished: same display as locked", () => {
+    expect(prizeBanner(perPerson(200, 8), "finished", " al campeón"))
+      .toEqual({ title: "$1,600 al campeón", subline: "8 × $200" });
+  });
 });
