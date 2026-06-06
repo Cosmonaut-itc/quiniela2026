@@ -140,8 +140,14 @@ export const detectFromSync = internalMutation({
         [...teamById].map(([id, tm]) => [id as string, { id: id as string, name: tm.name, flag: tm.flag }]));
       const ownerByTeam = new Map<string, string>(
         ownerships.map((o) => [o.teamId as string, o.participantId as string]));
+      const teamCountByParticipant = new Map<string, number>();
+      for (const o of ownerships) {
+        const key = o.participantId as string;
+        teamCountByParticipant.set(key, (teamCountByParticipant.get(key) ?? 0) + 1);
+      }
       const pInput = participants.map((p) => ({
-        id: p._id as string, teamCount: ownerships.filter((o) => o.participantId === p._id).length }));
+        id: p._id as string, teamCount: teamCountByParticipant.get(p._id as string) ?? 0,
+      }));
       const intents = detectSyncEvents({
         quinielaId: qn._id as string, now, soonMs: SOON_MS, tournamentStarted,
         teamById: teamLiteById, effMatches: effRows, states, ownerByTeam, participants: pInput,
