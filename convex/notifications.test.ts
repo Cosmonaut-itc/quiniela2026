@@ -15,6 +15,25 @@ async function quinielaWithPlayer() {
   return { t, q, personalToken: a.personalToken };
 }
 
+type T = ReturnType<typeof convexTest>;
+async function closedSolo(t: T, name: string) {
+  const q = await t.mutation(api.quinielas.createQuiniela, { name, prizeText: "$1", numParticipants: 1 });
+  await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: `${name}-p` });
+  await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+  return q;
+}
+async function assignKnockout(t: T) {
+  const km = await t.run((ctx) => ctx.db.query("matches").filter((q) => q.neq(q.field("stage"), "group")).first());
+  await t.mutation(internal.matches.upsertMatchResult, {
+    match: { externalId: km!.externalId, stage: km!.stage, group: null,
+      homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+      homeScore: null, awayScore: null, status: "scheduled", winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null } });
+  return km!.externalId;
+}
+const tokenOf = (t: T, quinielaId: string) =>
+  t.run((ctx) => ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", quinielaId as never)).first())
+    .then((p) => p!.personalToken);
+
 describe("lectura y marcado de avisos", () => {
   it("listForParticipant devuelve items y unreadCount; markRead los marca", async () => {
     const { t, q, personalToken } = await quinielaWithPlayer();
@@ -70,5 +89,61 @@ describe("lectura y marcado de avisos", () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.seedFromSnapshot, {});
     await expect(t.query(api.notifications.listForParticipant, { personalToken: "no-existe" })).rejects.toThrow();
+  });
+});
+
+describe("detectFromSync (cron)", () => {
+  it("AISLAMIENTO: un override que elimina en A genera team_eliminated solo en A, e idempotente", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const ext = await assignKnockout(t);
+    const a = await closedSolo(t, "A"); const b = await closedSolo(t, "B");
+    await t.mutation(api.matches.setMatchResultManual, {
+      adminToken: a.adminToken, matchExternalId: ext, homeScore: 1, awayScore: 0, finished: true }); // 759 fuera en A
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const listA = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, a.quinielaId) });
+    const listB = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, b.quinielaId) });
+    expect(listA.items.some((n) => n.type === "team_eliminated")).toBe(true);
+    expect(listB.items.some((n) => n.type === "team_eliminated")).toBe(false);
+    const before = listA.items.length;
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const listA2 = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, a.quinielaId) });
+    expect(listA2.items.length).toBe(before); // no duplica
+  });
+
+  it("match_soon avisa al dueño cuando el kickoff cae en la ventana", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const ext = await assignKnockout(t);
+    const a = await closedSolo(t, "A");
+    const m = await t.run((ctx) => ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", ext)).first());
+    await t.run((ctx) => ctx.db.patch(m!._id, { kickoffAt: Date.now() + 30 * 60_000, status: "scheduled" }));
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const list = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, a.quinielaId) });
+    expect(list.items.some((n) => n.type === "match_soon")).toBe(true);
+  });
+
+  it("champion_won al dueño del campeón derivado por quiniela", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const fm = await t.run((ctx) => ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "final")).first());
+    await t.mutation(internal.matches.upsertMatchResult, {
+      match: { externalId: fm!.externalId, stage: "final", group: null, homeExternalId: "758", awayExternalId: "759",
+        kickoffAt: fm!.kickoffAt, homeScore: 1, awayScore: 0, status: "finished", winnerExternalId: "758", bracketSlot: fm!.bracketSlot ?? null } });
+    const a = await closedSolo(t, "A");
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const list = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, a.quinielaId) });
+    expect(list.items.some((n) => n.type === "champion_won")).toBe(true);
+  });
+
+  it("tournament_started a todos cuando ya arrancó el primer partido", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const a = await closedSolo(t, "A");
+    const first = await t.run((ctx) => ctx.db.query("matches").withIndex("by_kickoff").first());
+    await t.run((ctx) => ctx.db.patch(first!._id, { kickoffAt: Date.now() - 60_000 }));
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const list = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, a.quinielaId) });
+    expect(list.items.some((n) => n.type === "tournament_started")).toBe(true);
   });
 });

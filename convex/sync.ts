@@ -20,6 +20,7 @@ export const syncMatches = internalAction({
       }
       await ctx.runMutation(internal.matches.recomputeTeamStates, {});
       await ctx.runMutation(internal.quinielas.autoCloseDue, {});
+      await ctx.runMutation(internal.notifications.detectFromSync, {});
       return { ok: true };
     } catch (e) {
       return { ok: false, error: String(e instanceof Error ? e.message : e) };
