@@ -24,6 +24,16 @@ describe("createQuiniela", () => {
     expect(qn!.slotSizes.reduce((a: number, b: number) => a + b, 0)).toBe(48);
     expect(qn!.status).toBe("open");
   });
+
+  it("stores the chosen assignMode and defaults to on_join", async () => {
+    const t = await seeded();
+    const def = await t.mutation(api.quinielas.createQuiniela, { name: "D", prizeText: "$1", numParticipants: 4 });
+    const rev = await t.mutation(api.quinielas.createQuiniela, { name: "R", prizeText: "$1", numParticipants: 4, assignMode: "on_reveal" });
+    const qd = await t.run((ctx) => ctx.db.get(def.quinielaId));
+    const qr = await t.run((ctx) => ctx.db.get(rev.quinielaId));
+    expect(qd!.assignMode).toBe("on_join");
+    expect(qr!.assignMode).toBe("on_reveal");
+  });
 });
 
 describe("closeAndRedistribute", () => {
@@ -43,6 +53,58 @@ describe("closeAndRedistribute", () => {
     const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
     expect(qn!.status).toBe("locked");
   });
+
+  it("reveals all 48 teams balanced when the admin closes an on_reveal quiniela", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2, assignMode: "on_reveal" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "A" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "B" });
+    // nobody owns a team before the reveal
+    let owns = await t.run((ctx) =>
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(owns.length).toBe(0);
+    // admin clicks "repartir" → all teams distributed and quiniela locked
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    owns = await t.run((ctx) =>
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(owns.length).toBe(48);
+    expect(new Set(owns.map((o) => o.teamId)).size).toBe(48);
+    const counts = new Map<string, number>();
+    for (const o of owns) counts.set(o.participantId, (counts.get(o.participantId) ?? 0) + 1);
+    expect([...counts.values()].sort((a, b) => a - b)).toEqual([24, 24]); // balanced
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.status).toBe("locked");
+  });
+});
+
+describe("autoCloseDue", () => {
+  it("locks an on_join quiniela once the first match has started", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "A" });
+    const first = await t.run((ctx) => ctx.db.query("matches").withIndex("by_kickoff").first());
+    await t.run((ctx) => ctx.db.patch(first!._id, { kickoffAt: 1 })); // force kickoff into the past
+    await t.mutation(internal.quinielas.autoCloseDue, {});
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.status).toBe("locked");
+  });
+
+  it("never auto-distributes an on_reveal quiniela (admin must reveal manually)", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2, assignMode: "on_reveal" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "A" });
+    const first = await t.run((ctx) => ctx.db.query("matches").withIndex("by_kickoff").first());
+    await t.run((ctx) => ctx.db.patch(first!._id, { kickoffAt: 1 }));
+    await t.mutation(internal.quinielas.autoCloseDue, {});
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.status).toBe("open"); // stays open — no automatic reveal
+    const owns = await t.run((ctx) =>
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(owns.length).toBe(0);
+  });
 });
 
 describe("getOverview", () => {
@@ -57,6 +119,16 @@ describe("getOverview", () => {
     expect(ov.players[0].status).toBe("alive");
     expect(ov.freeSlots).toBe(3);
   });
+
+  it("marks players pending before the reveal in on_reveal mode", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4, assignMode: "on_reveal" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    expect(ov.quiniela.assignMode).toBe("on_reveal");
+    expect(ov.players[0].status).toBe("pending");
+  });
 });
 
 describe("getAdmin", () => {
@@ -70,5 +142,12 @@ describe("getAdmin", () => {
     expect(admin.participants[0].teamCount).toBeGreaterThan(0);
     expect(admin.matches.length).toBe(104);
     expect(admin.quiniela.joinToken).toBe(q.joinToken);
+  });
+
+  it("exposes assignMode to the admin", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2, assignMode: "on_reveal" });
+    const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    expect(admin.quiniela.assignMode).toBe("on_reveal");
   });
 });

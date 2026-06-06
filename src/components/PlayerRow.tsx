@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 export function PlayerRow({ p }: { p: OverviewData["players"][number] }) {
   const out = p.status === "out";
   const champ = p.status === "champion";
+  const pending = p.status === "pending";
 
   return (
     <div
@@ -35,19 +36,21 @@ export function PlayerRow({ p }: { p: OverviewData["players"][number] }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2.5">
-        <span className="flex items-baseline gap-0.5 tabular-nums">
-          <span
-            className={cn(
-              "font-heading text-lg font-bold leading-none",
-              champ ? "text-gold" : out ? "text-eliminated" : "text-alive",
-            )}
-          >
-            {p.aliveCount}
+        {!pending && (
+          <span className="flex items-baseline gap-0.5 tabular-nums">
+            <span
+              className={cn(
+                "font-heading text-lg font-bold leading-none",
+                champ ? "text-gold" : out ? "text-eliminated" : "text-alive",
+              )}
+            >
+              {p.aliveCount}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              /{p.totalCount} vivos
+            </span>
           </span>
-          <span className="text-xs text-muted-foreground">
-            /{p.totalCount} vivos
-          </span>
-        </span>
+        )}
         <StatusBadge status={p.status} />
       </div>
     </div>

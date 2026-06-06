@@ -5,7 +5,11 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
 import { teamLite, photoUrl } from "./lib/view";
-import type { OverviewData, PlayerStatus, AdminData } from "./types";
+import type { OverviewData, PlayerStatus, AdminData, AssignMode } from "./types";
+
+/** Normalizes the stored (optional) assignMode; legacy rows without it are on_join. */
+const modeOf = (qn: Doc<"quinielas">): AssignMode =>
+  qn.assignMode === "on_reveal" ? "on_reveal" : "on_join";
 
 // Shared by closeAndRedistribute (manual) and autoCloseDue (cron): assign every
 // unowned team to the participant with the fewest teams, then lock the quiniela.
@@ -45,6 +49,7 @@ export const createQuiniela = mutation({
     prizeText: v.string(),
     numParticipants: v.number(),
     photoId: v.optional(v.id("_storage")),
+    assignMode: v.optional(v.string()), // "on_join" | "on_reveal"
   },
   handler: async (ctx, args) => {
     const n = Math.max(1, Math.min(48, Math.floor(args.numParticipants)));
@@ -59,6 +64,7 @@ export const createQuiniela = mutation({
       adminToken,
       joinToken,
       status: "open",
+      assignMode: args.assignMode === "on_reveal" ? "on_reveal" : "on_join",
       photoId: args.photoId,
       createdAt: Date.now(),
     });
@@ -90,6 +96,7 @@ export const autoCloseDue = internalMutation({
     if (!firstMatch || Date.now() < firstMatch.kickoffAt) return;
     const open = await ctx.db.query("quinielas").withIndex("by_status", (q) => q.eq("status", "open")).collect();
     for (const qn of open) {
+      if (modeOf(qn) === "on_reveal") continue; // reveal is manual-only; never auto-distribute
       const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       if (participants.length === 0) continue; // leave empty quinielas open
       await redistributeAndLock(ctx, qn, participants);
@@ -108,12 +115,16 @@ export const getOverview = query({
     const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     const ownerships = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
 
+    // on_reveal quinielas hand out no teams until the admin reveals (which locks them),
+    // so an open on_reveal player is "pending", not eliminated.
+    const pendingReveal = modeOf(qn) === "on_reveal" && qn.status === "open";
     const ownerByTeam = new Map(ownerships.map((o) => [o.teamId, o.participantId]));
     const players = participants.map((p) => {
       const mine = ownerships.filter((o) => o.participantId === p._id);
       const aliveCount = mine.filter((o) => teamById.get(o.teamId)?.alive).length;
       const isChampion = qn.championParticipantId === p._id;
-      const status: PlayerStatus = isChampion ? "champion" : aliveCount > 0 ? "alive" : "out";
+      const status: PlayerStatus = pendingReveal ? "pending"
+        : isChampion ? "champion" : aliveCount > 0 ? "alive" : "out";
       return { participantId: p._id as string, name: p.name,
         photoUrlId: p.photoId, aliveCount, totalCount: mine.length, status };
     });
@@ -133,6 +144,7 @@ export const getOverview = query({
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: qn.status as "open" | "locked" | "finished",
+        assignMode: modeOf(qn),
       },
       players: await Promise.all(players.map(async (p) => ({
         participantId: p.participantId, name: p.name, photoUrl: await photoUrl(ctx, p.photoUrlId),
@@ -170,7 +182,7 @@ export const getAdmin = query({
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
         numParticipants: qn.numParticipants, filledCount: participants.length,
         status: qn.status as "open" | "locked" | "finished",
-        joinToken: qn.joinToken,
+        joinToken: qn.joinToken, assignMode: modeOf(qn),
       },
       participants: participants.map((p) => ({
         name: p.name, personalToken: p.personalToken,

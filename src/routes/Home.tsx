@@ -19,6 +19,9 @@ export default function Home() {
   const [prize, setPrize] = useState("");
   const [n, setN] = useState(10);
   const [file, setFile] = useState<File | null>(null);
+  const [assignMode, setAssignMode] = useState<"on_join" | "on_reveal">(
+    "on_join",
+  );
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -31,6 +34,7 @@ export default function Home() {
         prizeText: prize,
         numParticipants: n,
         photoId: photoId as Id<"_storage"> | undefined,
+        assignMode,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
     } finally {
@@ -114,6 +118,49 @@ export default function Home() {
             <p className="text-xs text-muted-foreground">
               Entre 2 y 48 · los 48 equipos se reparten entre ustedes.
             </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Reparto de equipos</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    v: "on_join",
+                    title: "Al unirse",
+                    sub: "Cada quien recibe sus equipos al inscribirse.",
+                  },
+                  {
+                    v: "on_reveal",
+                    title: "Sorteo en vivo 🎲",
+                    sub: "Nadie recibe equipos hasta que des click. Más emoción.",
+                  },
+                ] as const
+              ).map((o) => {
+                const active = assignMode === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setAssignMode(o.v)}
+                    aria-pressed={active}
+                    className={
+                      "rounded-2xl border px-3 py-2.5 text-left transition-colors " +
+                      (active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-card text-muted-foreground hover:border-foreground/30")
+                    }
+                  >
+                    <div className="text-sm font-bold text-foreground">
+                      {o.title}
+                    </div>
+                    <div className="mt-0.5 text-[0.7rem] leading-snug">
+                      {o.sub}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">

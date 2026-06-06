@@ -116,6 +116,14 @@ export default function Join() {
       </header>
 
       {/* Players table */}
+      {quiniela.assignMode === "on_reveal" && quiniela.status === "open" && (
+        <div className="grain relative mt-6 flex items-center gap-2.5 overflow-hidden rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+          <span className="text-lg leading-none">🎲</span>
+          <span className="text-foreground/90">
+            Sorteo en vivo: los equipos se reparten cuando el organizador dé inicio.
+          </span>
+        </div>
+      )}
       <SectionHeading>Tabla de jugadores</SectionHeading>
       <div className="space-y-2.5">
         {data.players.length === 0 ? (

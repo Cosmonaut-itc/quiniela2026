@@ -42,6 +42,7 @@ export default defineSchema({
     adminToken: v.string(),
     joinToken: v.string(),
     status: v.string(), // "open" | "locked" | "finished"
+    assignMode: v.optional(v.string()), // "on_join" | "on_reveal"; missing = on_join (legacy)
     championParticipantId: v.optional(v.id("participants")),
     lockedAt: v.optional(v.number()),
     createdAt: v.number(),

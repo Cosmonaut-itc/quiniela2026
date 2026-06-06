@@ -17,23 +17,24 @@ export const joinQuiniela = mutation({
     const k = participants.length;
     if (k >= qn.numParticipants) throw new Error("Ya no hay lugares disponibles");
 
-    const size = qn.slotSizes[k];
-
-    // pool = teams not yet owned in this quiniela
-    const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
-    const ownedSet = new Set(owned.map((o) => o.teamId));
-    const allTeams = await ctx.db.query("teams").collect();
-    const pool = allTeams.filter((tm) => !ownedSet.has(tm._id)).map((tm) => tm._id);
-
-    const { picked } = drawN(pool, size, Math.random);
-
     const personalToken = newToken();
     const participantId = await ctx.db.insert("participants", {
       quinielaId: qn._id, name: args.name.trim().slice(0, 40),
       photoId: args.photoId, personalToken, slotIndex: k, joinedAt: Date.now(),
     });
-    for (const teamId of picked) {
-      await ctx.db.insert("ownerships", { quinielaId: qn._id, teamId, participantId });
+
+    // on_reveal: no teams until the admin reveals. on_join (default): draw a slot-sized
+    // batch from the still-unowned pool right now.
+    if (qn.assignMode !== "on_reveal") {
+      const size = qn.slotSizes[k];
+      const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+      const ownedSet = new Set(owned.map((o) => o.teamId));
+      const allTeams = await ctx.db.query("teams").collect();
+      const pool = allTeams.filter((tm) => !ownedSet.has(tm._id)).map((tm) => tm._id);
+      const { picked } = drawN(pool, size, Math.random);
+      for (const teamId of picked) {
+        await ctx.db.insert("ownerships", { quinielaId: qn._id, teamId, participantId });
+      }
     }
     return { personalToken };
   },
@@ -89,7 +90,10 @@ export const getPersonalPanel = query({
     });
 
     const aliveCount = teamsOut.filter((x) => x.alive).length;
-    const status: PlayerStatus = qn.championParticipantId === me._id ? "champion" : aliveCount > 0 ? "alive" : "out";
+    // on_reveal before the admin reveals: the player has joined but holds no teams yet.
+    const pendingReveal = qn.assignMode === "on_reveal" && qn.status === "open";
+    const status: PlayerStatus = pendingReveal ? "pending"
+      : qn.championParticipantId === me._id ? "champion" : aliveCount > 0 ? "alive" : "out";
 
     // playingNow: my teams whose next match is live or starts within 3h
     const soon = Date.now() + 3 * 3600_000;

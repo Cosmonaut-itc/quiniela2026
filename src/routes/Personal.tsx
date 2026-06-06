@@ -39,11 +39,13 @@ export default function Personal() {
 
   const { me } = data;
   const statusLabel =
-    me.status === "champion"
-      ? "Campeón"
-      : me.status === "out"
-        ? "Fuera"
-        : `Vivo · ${me.aliveCount} ${me.aliveCount === 1 ? "equipo" : "equipos"}`;
+    me.status === "pending"
+      ? "En espera del sorteo"
+      : me.status === "champion"
+        ? "Campeón"
+        : me.status === "out"
+          ? "Fuera"
+          : `Vivo · ${me.aliveCount} ${me.aliveCount === 1 ? "equipo" : "equipos"}`;
 
   return (
     <Shell
@@ -83,77 +85,96 @@ export default function Personal() {
           />
         </div>
         <PrizeBanner
-          text={data.prizeText && `${data.prizeText} — para el dueño del campeón`}
+          text={
+            data.prizeText && `${data.prizeText} — para el dueño del campeón`
+          }
         />
       </header>
 
-      {/* Playing now / soon */}
-      {data.playingNow.length > 0 && (
+      {me.status === "pending" && (
+        <div className="grain animate-rise relative mt-6 overflow-hidden rounded-3xl border border-border bg-card px-5 py-8 text-center">
+          <div className="text-4xl">🎲</div>
+          <h2 className="mt-2 font-heading text-lg font-extrabold tracking-tight">
+            El sorteo aún no empieza
+          </h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Tus equipos aparecerán aquí en cuanto el organizador haga el
+            reparto. ¡Prepárate!
+          </p>
+        </div>
+      )}
+
+      {me.status !== "pending" && (
         <>
-          <SectionHeading>Jugando ahora / pronto</SectionHeading>
-          <div className="space-y-2.5">
-            {data.playingNow.map((g, i) => (
-              <div
-                key={i}
-                className={
-                  "grain relative overflow-hidden rounded-2xl border px-3.5 py-3 " +
-                  (g.status === "live"
-                    ? "border-alive/40 [background:linear-gradient(100deg,oklch(0.32_0.08_150/0.5),oklch(0.26_0.04_160/0.3))]"
-                    : "border-border bg-card")
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <span className="text-2xl leading-none">
-                      {g.myTeam.flag}
-                    </span>
-                    <span className="font-heading font-bold">
-                      Tu {g.myTeam.name}
-                    </span>
-                  </span>
-                  {g.status === "live" ? (
-                    <span className="flex items-center gap-1.5 text-[0.7rem] font-bold tracking-wide text-alive uppercase">
-                      <span className="size-1.5 animate-pulse rounded-full bg-alive" />
-                      En vivo
-                    </span>
-                  ) : (
-                    <span className="text-[0.7rem] font-medium text-muted-foreground">
-                      {whenLabel(g.kickoffAt)}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="text-lg leading-none">
-                    {g.opponent.flag}
-                  </span>
-                  <span>
-                    {g.opponent.name} — de{" "}
-                    <span className="font-semibold text-foreground/80">
-                      {g.opponentOwner}
-                    </span>
-                  </span>
-                  <span className="ml-auto">⚔️</span>
-                </div>
+          {/* Playing now / soon */}
+          {data.playingNow.length > 0 && (
+            <>
+              <SectionHeading>Jugando ahora / pronto</SectionHeading>
+              <div className="space-y-2.5">
+                {data.playingNow.map((g, i) => (
+                  <div
+                    key={i}
+                    className={
+                      "grain relative overflow-hidden rounded-2xl border px-3.5 py-3 " +
+                      (g.status === "live"
+                        ? "border-alive/40 [background:linear-gradient(100deg,oklch(0.32_0.08_150/0.5),oklch(0.26_0.04_160/0.3))]"
+                        : "border-border bg-card")
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span className="text-2xl leading-none">
+                          {g.myTeam.flag}
+                        </span>
+                        <span className="font-heading font-bold">
+                          Tu {g.myTeam.name}
+                        </span>
+                      </span>
+                      {g.status === "live" ? (
+                        <span className="flex items-center gap-1.5 text-[0.7rem] font-bold tracking-wide text-alive uppercase">
+                          <span className="size-1.5 animate-pulse rounded-full bg-alive" />
+                          En vivo
+                        </span>
+                      ) : (
+                        <span className="text-[0.7rem] font-medium text-muted-foreground">
+                          {whenLabel(g.kickoffAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="text-lg leading-none">
+                        {g.opponent.flag}
+                      </span>
+                      <span>
+                        {g.opponent.name} — de{" "}
+                        <span className="font-semibold text-foreground/80">
+                          {g.opponentOwner}
+                        </span>
+                      </span>
+                      <span className="ml-auto">⚔️</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </>
+          )}
+
+          {/* My teams */}
+          <SectionHeading>
+            Mis equipos
+            <span className="ml-1.5 font-medium text-foreground/40">
+              {me.aliveCount}/{me.totalCount} vivos
+            </span>
+          </SectionHeading>
+          <div className="space-y-2.5">
+            {data.teams.length === 0 ? (
+              <EmptyTile>Aún no tienes equipos asignados.</EmptyTile>
+            ) : (
+              data.teams.map((t, i) => <TeamCard key={i} t={t} />)
+            )}
           </div>
         </>
       )}
-
-      {/* My teams */}
-      <SectionHeading>
-        Mis equipos
-        <span className="ml-1.5 font-medium text-foreground/40">
-          {me.aliveCount}/{me.totalCount} vivos
-        </span>
-      </SectionHeading>
-      <div className="space-y-2.5">
-        {data.teams.length === 0 ? (
-          <EmptyTile>Aún no tienes equipos asignados.</EmptyTile>
-        ) : (
-          data.teams.map((t, i) => <TeamCard key={i} t={t} />)
-        )}
-      </div>
 
       {/* Mundial link */}
       <Link

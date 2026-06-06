@@ -1,9 +1,15 @@
 // convex/types.ts
-export type PlayerStatus = "alive" | "out" | "champion";
+export type PlayerStatus = "alive" | "out" | "champion" | "pending";
+
+// How a quiniela hands out teams:
+//   on_join   → each player draws their teams the moment they join (default)
+//   on_reveal → nobody gets teams until the admin clicks "repartir" (manual, never automatic)
+export type AssignMode = "on_join" | "on_reveal";
 
 export type OverviewData = {
   quiniela: { name: string; photoUrl: string | null; prizeText: string;
-              numParticipants: number; filledCount: number; status: "open" | "locked" | "finished" };
+              numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
+              assignMode: AssignMode };
   players: { participantId: string; name: string; photoUrl: string | null;
              aliveCount: number; totalCount: number; status: PlayerStatus }[];
   freeSlots: number;
@@ -39,7 +45,7 @@ export type MundialData = {
 export type AdminData = {
   quiniela: { name: string; photoUrl: string | null; prizeText: string;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
-              joinToken: string };
+              joinToken: string; assignMode: AssignMode };
   participants: { name: string; personalToken: string; teamCount: number }[];
   matches: { externalId: string; stage: string; label: string;
              homeTeam: TeamLite | null; awayTeam: TeamLite | null;

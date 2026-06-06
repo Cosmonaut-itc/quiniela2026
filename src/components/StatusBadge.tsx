@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Festive status pill shared by the players table and the personal header.
- * champion → gold 🏆 · out → red "Fuera" · alive → green "Vivo".
+ * champion → gold 🏆 · out → red "Fuera" · pending → muted ⏳ "En espera" · alive → green "Vivo".
  * `label` overrides the default text (e.g. "Vivo · 3 equipos").
  */
 export function StatusBadge({
@@ -16,6 +16,18 @@ export function StatusBadge({
   label?: string;
   className?: string;
 }) {
+  if (status === "pending") {
+    return (
+      <Badge
+        className={cn(
+          "border-transparent bg-muted font-semibold text-muted-foreground",
+          className,
+        )}
+      >
+        ⏳ {label ?? "En espera"}
+      </Badge>
+    );
+  }
   if (status === "champion") {
     return (
       <Badge

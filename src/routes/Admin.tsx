@@ -39,6 +39,7 @@ export default function Admin() {
   if (data === undefined) return <LoadingState />;
 
   const { quiniela } = data;
+  const reveal = quiniela.assignMode === "on_reveal";
   const joinUrl = `${location.origin}/q/${id}/join/${data.quiniela.joinToken}`;
 
   const statusLabel =
@@ -61,7 +62,7 @@ export default function Admin() {
     setClosing(true);
     try {
       await close({ adminToken: token! });
-      toast.success("Quiniela cerrada · equipos repartidos");
+      toast.success(reveal ? "¡Equipos repartidos! 🎲" : "Quiniela cerrada · equipos repartidos");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo cerrar");
     } finally {
@@ -132,14 +133,27 @@ export default function Admin() {
 
       {/* Close & redistribute */}
       {quiniela.status === "open" && (
-        <Button
-          size="lg"
-          className="glow-primary mt-4 h-12 w-full rounded-2xl text-base font-bold"
-          disabled={closing}
-          onClick={() => void onClose()}
-        >
-          {closing ? "Cerrando…" : "🔒 Cerrar y repartir equipos"}
-        </Button>
+        <>
+          <Button
+            size="lg"
+            className="glow-primary mt-4 h-12 w-full rounded-2xl text-base font-bold"
+            disabled={closing}
+            onClick={() => void onClose()}
+          >
+            {reveal
+              ? closing
+                ? "Repartiendo…"
+                : "🎲 Repartir equipos ahora"
+              : closing
+                ? "Cerrando…"
+                : "🔒 Cerrar y repartir equipos"}
+          </Button>
+          {reveal && (
+            <p className="mt-2 text-center text-[0.7rem] text-muted-foreground">
+              {quiniela.filledCount} {quiniela.filledCount === 1 ? "jugador inscrito" : "jugadores inscritos"} · nadie tiene equipos hasta que repartas
+            </p>
+          )}
+        </>
       )}
 
       {/* Participants */}
