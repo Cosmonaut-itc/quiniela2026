@@ -3,8 +3,10 @@ import { useQuery, useMutation } from "convex/react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { Shell } from "@/components/Shell";
 import { SectionHeading } from "@/components/bits";
+import { formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +32,7 @@ export default function Admin() {
   const data = useQuery(api.quinielas.getAdmin, { adminToken: token! });
   const close = useMutation(api.quinielas.closeAndRedistribute);
   const saveNotes = useMutation(api.quinielas.updateNotes);
+  const setPaid = useMutation(api.participants.setParticipantPaid);
   const setResult = useMutation(api.matches.setMatchResultManual);
   const clearOverride = useMutation(api.matches.clearMatchOverride);
 
@@ -51,6 +54,10 @@ export default function Admin() {
   const savedNotes = quiniela.notes ?? "";
   // Mientras no se edite, muestra lo que hay en el servidor.
   const notesValue = notesEdit ?? savedNotes;
+  const perPerson = quiniela.prize.mode === "per_person";
+  const paidCount = quiniela.prize.contributors;
+  const pendingCount = quiniela.filledCount - paidCount;
+  const pendingPesos = pendingCount * (quiniela.prize.entryFee ?? 0);
 
   const statusLabel =
     quiniela.status === "open"
@@ -91,6 +98,14 @@ export default function Admin() {
       toast.error(e instanceof Error ? e.message : "No se pudieron guardar las notas");
     } finally {
       setSavingNotes(false);
+    }
+  }
+
+  async function onTogglePaid(participantId: string, paid: boolean) {
+    try {
+      await setPaid({ adminToken: token!, participantId: participantId as Id<"participants">, paid });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar el pago");
     }
   }
 
@@ -251,6 +266,17 @@ export default function Admin() {
           {data.participants.length}
         </span>
       </SectionHeading>
+      {perPerson && (
+        <div className="mb-2.5 rounded-2xl border border-gold/30 bg-card px-4 py-3 text-sm">
+          <div className="font-semibold text-gold">
+            Bote confirmado: {formatMXN(quiniela.prize.pool ?? 0)}
+          </div>
+          <div className="mt-0.5 text-[0.7rem] text-muted-foreground">
+            {paidCount}/{quiniela.filledCount} pagados
+            {pendingCount > 0 && ` · ${formatMXN(pendingPesos)} pendientes`}
+          </div>
+        </div>
+      )}
       <div className="space-y-2.5">
         {data.participants.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border px-4 py-3 text-center text-xs text-muted-foreground">
@@ -270,6 +296,21 @@ export default function Admin() {
                   {p.teamCount} {p.teamCount === 1 ? "equipo" : "equipos"}
                 </div>
               </div>
+              {perPerson && (
+                <button
+                  type="button"
+                  onClick={() => void onTogglePaid(p.id, !p.paid)}
+                  aria-pressed={p.paid}
+                  className={
+                    "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors " +
+                    (p.paid
+                      ? "bg-alive/15 text-alive"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {p.paid ? "✓ Pagó" : "Pendiente"}
+                </button>
+              )}
               <Button
                 size="sm"
                 variant="outline"

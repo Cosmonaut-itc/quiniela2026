@@ -108,7 +108,7 @@ export default function Home() {
                   {
                     v: "per_person",
                     title: "Por participación 💰",
-                    sub: "Cuota por persona; el bote crece con cada quien entra.",
+                    sub: "Cuota por persona; el bote se arma con quienes confirmen su pago.",
                   },
                 ] as const
               ).map((o) => {
@@ -189,7 +189,7 @@ export default function Home() {
             />
             <p className="text-xs text-muted-foreground">
               {prizeMode === "per_person"
-                ? "Tope de gente; el bote se arma con los que entren. Los 48 equipos se reparten entre ustedes."
+                ? "Tope de gente; el bote refleja a quienes ya pagaron (tú confirmas cada pago). Los 48 equipos se reparten entre ustedes."
                 : "Entre 2 y 48 · los 48 equipos se reparten entre ustedes."}
             </p>
           </div>

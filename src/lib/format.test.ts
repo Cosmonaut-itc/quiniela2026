@@ -26,11 +26,11 @@ describe("prizeBanner", () => {
   });
   it("per_person open: live growing pot", () => {
     expect(prizeBanner(perPerson(200, 7), "open", " al campeón"))
-      .toEqual({ title: "Bote: $1,400", subline: "$200 × 7 inscritos" });
+      .toEqual({ title: "Bote: $1,400", subline: "$200 × 7 pagados" });
   });
   it("per_person open singular", () => {
     expect(prizeBanner(perPerson(200, 1), "open", " al campeón").subline)
-      .toBe("$200 × 1 inscrito");
+      .toBe("$200 × 1 pagado");
   });
   it("per_person closed: total to the champion", () => {
     expect(prizeBanner(perPerson(200, 8), "locked", " al campeón"))

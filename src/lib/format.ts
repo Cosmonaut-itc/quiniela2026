@@ -19,7 +19,7 @@ export function prizeBanner(
     const pool = formatMXN(prize.pool ?? 0);
     const n = prize.contributors;
     if (status === "open") {
-      return { title: `Bote: ${pool}`, subline: `${fee} × ${n} ${n === 1 ? "inscrito" : "inscritos"}` };
+      return { title: `Bote: ${pool}`, subline: `${fee} × ${n} ${n === 1 ? "pagado" : "pagados"}` };
     }
     return { title: `${pool}${championSuffix}`, subline: `${n} × ${fee}` };
   }
