@@ -32,6 +32,10 @@ describe("prizeBanner", () => {
     expect(prizeBanner(perPerson(200, 1), "open", " al campeón").subline)
       .toBe("$200 × 1 pagado");
   });
+  it("per_person open with nobody paid yet (estado inicial)", () => {
+    expect(prizeBanner(perPerson(200, 0), "open", " al campeón"))
+      .toEqual({ title: "Bote: $0", subline: "$200 × 0 pagados" });
+  });
   it("per_person closed: total to the champion", () => {
     expect(prizeBanner(perPerson(200, 8), "locked", " al campeón"))
       .toEqual({ title: "$1,600 al campeón", subline: "8 × $200" });
