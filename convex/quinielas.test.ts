@@ -34,6 +34,33 @@ describe("createQuiniela", () => {
     expect(qd!.assignMode).toBe("on_join");
     expect(qr!.assignMode).toBe("on_reveal");
   });
+
+  it("stores per_person mode with a validated entry fee and empty prizeText", async () => {
+    const t = await seeded();
+    const res = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Rifa", prizeText: "ignorado", numParticipants: 20,
+      prizeMode: "per_person", entryFee: 200,
+    });
+    const qn = await t.run((ctx) => ctx.db.get(res.quinielaId));
+    expect(qn!.prizeMode).toBe("per_person");
+    expect(qn!.entryFee).toBe(200);
+    expect(qn!.prizeText).toBe("");
+  });
+
+  it("clamps a per_person fee below 1 up to 1 and defaults to fixed", async () => {
+    const t = await seeded();
+    const low = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Low", prizeText: "", numParticipants: 4, prizeMode: "per_person", entryFee: 0,
+    });
+    const fix = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Fix", prizeText: "$1", numParticipants: 4,
+    });
+    const ql = await t.run((ctx) => ctx.db.get(low.quinielaId));
+    const qf = await t.run((ctx) => ctx.db.get(fix.quinielaId));
+    expect(ql!.entryFee).toBe(1);
+    expect(qf!.prizeMode).toBe("fixed");
+    expect(qf!.entryFee).toBeUndefined();
+  });
 });
 
 describe("closeAndRedistribute", () => {

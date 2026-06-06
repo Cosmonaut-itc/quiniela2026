@@ -51,15 +51,21 @@ export const createQuiniela = mutation({
     numParticipants: v.number(),
     photoId: v.optional(v.id("_storage")),
     assignMode: v.optional(v.string()), // "on_join" | "on_reveal"
+    prizeMode: v.optional(v.string()),  // "fixed" | "per_person"
+    entryFee: v.optional(v.number()),   // requerido en per_person
   },
   handler: async (ctx, args) => {
     const n = Math.max(1, Math.min(48, Math.floor(args.numParticipants)));
     const slotSizes = shuffleInPlace(computeSlotSizes(n, 48), Math.random);
     const adminToken = newToken();
     const joinToken = newToken();
+    const perPerson = args.prizeMode === "per_person";
+    const entryFee = perPerson ? Math.max(1, Math.floor(args.entryFee ?? 0)) : undefined;
     const quinielaId = await ctx.db.insert("quinielas", {
       name: args.name.trim().slice(0, 60),
-      prizeText: args.prizeText.trim().slice(0, 60),
+      prizeText: perPerson ? "" : args.prizeText.trim().slice(0, 60),
+      prizeMode: perPerson ? "per_person" : "fixed",
+      entryFee,
       numParticipants: n,
       slotSizes,
       adminToken,
