@@ -1,8 +1,10 @@
 // convex/quinielas.ts
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
+import { teamLite, photoUrl } from "./lib/view";
+import type { OverviewData, PlayerStatus } from "./types";
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -65,5 +67,57 @@ export const closeAndRedistribute = mutation({
     }
     await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });
     return { ok: true as const };
+  },
+});
+
+export const getOverview = query({
+  args: { joinToken: v.string() },
+  handler: async (ctx, args): Promise<OverviewData> => {
+    const qn = await ctx.db.query("quinielas").withIndex("by_joinToken", (q) => q.eq("joinToken", args.joinToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+
+    const teams = await ctx.db.query("teams").collect();
+    const teamById = new Map(teams.map((t) => [t._id, t]));
+    const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+    const ownerships = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+
+    const ownerByTeam = new Map(ownerships.map((o) => [o.teamId, o.participantId]));
+    const players = participants.map((p) => {
+      const mine = ownerships.filter((o) => o.participantId === p._id);
+      const aliveCount = mine.filter((o) => teamById.get(o.teamId)?.alive).length;
+      const isChampion = qn.championParticipantId === p._id;
+      const status: PlayerStatus = isChampion ? "champion" : aliveCount > 0 ? "alive" : "out";
+      return { participantId: p._id as string, name: p.name,
+        photoUrlId: p.photoId, aliveCount, totalCount: mine.length, status };
+    });
+    players.sort((a, b) =>
+      (b.status === "out" ? 0 : 1) - (a.status === "out" ? 0 : 1) || b.aliveCount - a.aliveCount);
+
+    // upcoming duels: next scheduled matches where both teams owned in this quiniela
+    const upcoming = (await ctx.db.query("matches").withIndex("by_kickoff").collect())
+      .filter((mt) => mt.status !== "finished" && mt.homeTeamId && mt.awayTeamId
+        && ownerByTeam.has(mt.homeTeamId) && ownerByTeam.has(mt.awayTeamId))
+      .sort((a, b) => a.kickoffAt - b.kickoffAt)
+      .slice(0, 8);
+    const nameById = new Map(participants.map((p) => [p._id, p.name]));
+
+    return {
+      quiniela: {
+        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prizeText: qn.prizeText,
+        numParticipants: qn.numParticipants, filledCount: participants.length, status: qn.status as any,
+      },
+      players: await Promise.all(players.map(async (p) => ({
+        participantId: p.participantId, name: p.name, photoUrl: await photoUrl(ctx, p.photoUrlId),
+        aliveCount: p.aliveCount, totalCount: p.totalCount, status: p.status,
+      }))),
+      freeSlots: Math.max(0, qn.numParticipants - participants.length),
+      upcomingDuels: upcoming.map((mt) => ({
+        homeOwner: nameById.get(ownerByTeam.get(mt.homeTeamId!)!) ?? "",
+        homeTeam: teamLite(teamById.get(mt.homeTeamId!))!,
+        awayOwner: nameById.get(ownerByTeam.get(mt.awayTeamId!)!) ?? "",
+        awayTeam: teamLite(teamById.get(mt.awayTeamId!))!,
+        kickoffAt: mt.kickoffAt,
+      })),
+    };
   },
 });

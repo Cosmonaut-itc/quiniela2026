@@ -44,3 +44,17 @@ describe("closeAndRedistribute", () => {
     expect(qn!.status).toBe("locked");
   });
 });
+
+describe("getOverview", () => {
+  it("ranks players by alive then alive-count and reports free slots", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    expect(ov.quiniela.name).toBe("F");
+    expect(ov.players).toHaveLength(1);
+    expect(ov.players[0].status).toBe("alive");
+    expect(ov.freeSlots).toBe(3);
+  });
+});
