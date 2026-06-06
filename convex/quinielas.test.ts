@@ -25,3 +25,22 @@ describe("createQuiniela", () => {
     expect(qn!.status).toBe("open");
   });
 });
+
+describe("closeAndRedistribute", () => {
+  it("assigns all 48 teams when some slots were never filled", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 10 });
+    // only 3 of 10 join
+    for (const name of ["A", "B", "C"]) {
+      await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name });
+    }
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    const owns = await t.run((ctx) =>
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId as any)).collect());
+    expect(owns.length).toBe(48); // every team owned
+    expect(new Set(owns.map((o) => o.teamId)).size).toBe(48);
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId as any));
+    expect(qn!.status).toBe("locked");
+  });
+});
