@@ -119,6 +119,13 @@ export default function Admin() {
     setSavingId(externalId);
     try {
       await clearOverride({ adminToken: token!, matchExternalId: externalId });
+      // Suelta la selección local de ganador para que un guardado posterior no
+      // reaplique el ganador viejo (el partido volvió al automático).
+      setWinners((prev) => {
+        const next = { ...prev };
+        delete next[externalId];
+        return next;
+      });
       toast.success("Volvió al resultado automático");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo revertir");

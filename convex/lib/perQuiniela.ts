@@ -21,6 +21,13 @@ export type Resolved = {
  * deriva vivos/etapa/campeón PARA ESA QUINIELA. Única fuente de la resolución por
  * quiniela: todas las queries por quiniela pasan por aquí, así el aislamiento es
  * inevitable. Con cero overrides, el resultado es idéntico al baseline global.
+ *
+ * Invariantes de cobertura (por eso los callers usan `!` con seguridad):
+ *  - `effById` y `effRows` tienen UNA entrada por cada partido global (`matches`),
+ *    así que `effById.get(mt._id)!` es seguro para todo `mt` de `matches`.
+ *  - `states` y `teamById` tienen UNA entrada por cada equipo global (computeTeamStates
+ *    inicializa todos los equipos), así que `states.get(teamId)!` / `teamById.get(teamId)!`
+ *    son seguros para cualquier teamId de un equipo, ownership o partido.
  */
 export async function resolveQuiniela(ctx: QueryCtx, quinielaId: Id<"quinielas">): Promise<Resolved> {
   const teams = await ctx.db.query("teams").collect();
@@ -37,7 +44,7 @@ export async function resolveQuiniela(ctx: QueryCtx, quinielaId: Id<"quinielas">
   }));
   const overrideRows = overrides.map((o) => ({
     matchId: o.matchId as string, homeScore: o.homeScore, awayScore: o.awayScore,
-    status: o.status, winnerTeamId: (o.winnerTeamId as string) ?? null,
+    status: o.status, winnerTeamId: (o.winnerTeamId ?? null) as string | null,
   }));
 
   const effRows = effectiveMatches(matchRows, overrideRows);

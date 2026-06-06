@@ -76,6 +76,8 @@ export default defineSchema({
   // Corrección manual de marcador POR QUINIELA. La presencia de una fila = ese
   // partido está corregido a mano en esa quiniela; se superpone al resultado
   // global (API) solo para esa quiniela. El `matches` global nunca se toca.
+  // Invariante: una sola fila por (quinielaId, matchId) — garantizada por el upsert
+  // de setMatchResultManual (busca por by_quiniela_match y hace patch o insert).
   matchOverrides: defineTable({
     quinielaId: v.id("quinielas"),
     matchId: v.id("matches"),
