@@ -29,10 +29,12 @@ export default function Admin() {
   const data = useQuery(api.quinielas.getAdmin, { adminToken: token! });
   const close = useMutation(api.quinielas.closeAndRedistribute);
   const setResult = useMutation(api.matches.setMatchResultManual);
+  const clearOverride = useMutation(api.matches.clearMatchOverride);
 
   const [scores, setScores] = useState<Record<string, { h?: string; a?: string }>>(
     {},
   );
+  const [winners, setWinners] = useState<Record<string, "home" | "draw" | "away">>({});
   const [closing, setClosing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -70,20 +72,56 @@ export default function Admin() {
     }
   }
 
-  async function saveScore(externalId: string) {
-    const s = scores[externalId] ?? {};
-    setSavingId(externalId);
+  type AdminMatch = (typeof data.matches)[number];
+
+  // En eliminatoria el empate necesita un ganador explícito (penales/prórroga);
+  // preselecciona con el ganador efectivo que ya trae la quiniela.
+  function selectedWinner(m: AdminMatch): "home" | "draw" | "away" {
+    return (
+      winners[m.externalId] ??
+      (m.winnerExternalId && m.winnerExternalId === m.homeExternalId
+        ? "home"
+        : m.winnerExternalId && m.winnerExternalId === m.awayExternalId
+          ? "away"
+          : "draw")
+    );
+  }
+
+  async function saveScore(m: AdminMatch) {
+    const s = scores[m.externalId] ?? {};
+    const homeScore = Number(s.h ?? m.homeScore ?? 0);
+    const awayScore = Number(s.a ?? m.awayScore ?? 0);
+    let winnerExternalId: string | null | undefined = undefined;
+    if (m.stage !== "group") {
+      const sel = selectedWinner(m);
+      winnerExternalId =
+        sel === "home" ? m.homeExternalId : sel === "away" ? m.awayExternalId : null;
+    }
+    setSavingId(m.externalId);
     try {
       await setResult({
         adminToken: token!,
-        matchExternalId: externalId,
-        homeScore: Number(s.h || 0),
-        awayScore: Number(s.a || 0),
+        matchExternalId: m.externalId,
+        homeScore,
+        awayScore,
         finished: true,
+        winnerExternalId,
       });
       toast.success("Marcador actualizado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function revertScore(externalId: string) {
+    setSavingId(externalId);
+    try {
+      await clearOverride({ adminToken: token!, matchExternalId: externalId });
+      toast.success("Volvió al resultado automático");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo revertir");
     } finally {
       setSavingId(null);
     }
@@ -221,8 +259,18 @@ export default function Admin() {
                     {m.label}
                   </span>
                   {m.manualOverride && (
-                    <span className="text-[0.65rem] font-semibold text-gold">
-                      editado a mano
+                    <span className="flex items-center gap-2">
+                      <span className="text-[0.65rem] font-semibold text-gold">
+                        editado a mano
+                      </span>
+                      <button
+                        type="button"
+                        disabled={savingId === m.externalId}
+                        onClick={() => void revertScore(m.externalId)}
+                        className="text-[0.65rem] font-semibold text-muted-foreground underline-offset-2 hover:text-gold hover:underline disabled:opacity-50"
+                      >
+                        ↺ volver al automático
+                      </button>
                     </span>
                   )}
                 </div>
@@ -277,7 +325,7 @@ export default function Admin() {
                     className="size-9 shrink-0 rounded-lg"
                     disabled={saving}
                     aria-label="Guardar marcador"
-                    onClick={() => void saveScore(m.externalId)}
+                    onClick={() => void saveScore(m)}
                   >
                     {saving ? (
                       <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -286,6 +334,35 @@ export default function Admin() {
                     )}
                   </Button>
                 </div>
+                {m.stage !== "group" && (
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
+                      Ganador
+                    </span>
+                    {(
+                      [
+                        ["home", m.homeTeam!.code],
+                        ["draw", "Empate"],
+                        ["away", m.awayTeam!.code],
+                      ] as const
+                    ).map(([key, lbl]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setWinners((p) => ({ ...p, [m.externalId]: key }))}
+                        className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${
+                          selectedWinner(m) === key
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/60 text-muted-foreground"
+                        }`}
+                        aria-pressed={selectedWinner(m) === key}
+                        aria-label={`Ganador ${lbl}`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
