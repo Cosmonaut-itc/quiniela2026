@@ -1,6 +1,6 @@
 // convex/lib/view.ts
 import type { Id } from "../_generated/dataModel";
-import type { TeamLite } from "../types";
+import type { TeamLite, PrizeMode, PrizeView } from "../types";
 
 export function teamLite(
   t: { code: string; name: string; flag: string; group: string } | null | undefined,
@@ -13,4 +13,19 @@ export async function photoUrl(
   id?: Id<"_storage"> | null,
 ): Promise<string | null> {
   return id ? await ctx.storage.getUrl(id) : null;
+}
+
+export function prizeModeOf(qn: { prizeMode?: string }): PrizeMode {
+  return qn.prizeMode === "per_person" ? "per_person" : "fixed";
+}
+
+export function prizeView(
+  qn: { prizeMode?: string; prizeText: string; entryFee?: number },
+  contributors: number,
+): PrizeView {
+  if (prizeModeOf(qn) === "per_person") {
+    const entryFee = qn.entryFee ?? 0;
+    return { mode: "per_person", text: "", entryFee, pool: entryFee * contributors, contributors };
+  }
+  return { mode: "fixed", text: qn.prizeText, entryFee: null, pool: null, contributors };
 }

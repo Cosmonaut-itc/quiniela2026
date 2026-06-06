@@ -6,6 +6,20 @@ export type PlayerStatus = "alive" | "out" | "champion" | "pending";
 //   on_reveal → nobody gets teams until the admin clicks "repartir" (manual, never automatic)
 export type AssignMode = "on_join" | "on_reveal";
 
+// Cómo se define el premio:
+//   fixed      → texto libre (prizeText), como hasta ahora (default / legacy)
+//   per_person → cuota por persona (entryFee); el bote crece con los inscritos
+export type PrizeMode = "fixed" | "per_person";
+
+export type PrizeView = {
+  mode: PrizeMode;
+  text: string;            // fixed: prizeText. per_person: "".
+  entryFee: number | null; // per_person: la cuota. fixed: null.
+  pool: number | null;     // per_person: entryFee * contributors. fixed: null.
+  contributors: number;    // filledCount (relevante en per_person).
+};
+
+
 export type OverviewData = {
   quiniela: { name: string; photoUrl: string | null; prizeText: string;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
