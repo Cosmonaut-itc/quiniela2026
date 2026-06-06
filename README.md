@@ -218,17 +218,6 @@ agregar las dos variables y desplegar.
 - `npm run lint` en limpio (0 errores).
 - Validado en navegador con Playwright (incluido el aislamiento A↔B y el revert) y revisado con CodeRabbit.
 
-## ✅ Correcciones aisladas por quiniela (v1.5)
-
-> *Antes (v1.0):* la corrección manual editaba la fila **global** del partido, así que en un
-> deployment con varias quinielas afectaba a **todas**.
-
-Ahora cada corrección se guarda como un **override por quiniela** (tabla `matchOverrides`): el
-`matches` global vuelve a ser **verdad‑API pura** y cada quiniela deriva sus vivos/campeón
-combinando los partidos globales con sus propios overrides. Una corrección **nunca** se filtra a
-otras quinielas, se puede **revertir** al resultado automático, e incluye **selector de ganador**
-para empates de eliminatoria (penales/prórroga).
-
 ---
 
 Diseño e implementación documentados en `docs/superpowers/`.
