@@ -78,6 +78,27 @@ describe("getPersonalPanel", () => {
     expect(panel.me.status).toBe("pending");
     expect(panel.teams.length).toBe(0);
   });
+
+  it("reflects the PAID pool in the per_person prize view", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Rifa", prizeText: "", numParticipants: 20, prizeMode: "per_person", entryFee: 200,
+    });
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Beto" });
+    // nadie ha pagado → bote 0
+    let panel = await t.query(api.participants.getPersonalPanel, { personalToken: a.personalToken });
+    expect(panel.prize.pool).toBe(0);
+    expect(panel.prize.contributors).toBe(0);
+    // confirmo el pago de Ana → bote 200
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[0]._id, paid: true });
+    panel = await t.query(api.participants.getPersonalPanel, { personalToken: a.personalToken });
+    expect(panel.prize.pool).toBe(200);
+    expect(panel.prize.contributors).toBe(1);
+  });
 });
 
 describe("setParticipantPaid", () => {

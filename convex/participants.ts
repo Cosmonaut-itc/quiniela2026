@@ -49,7 +49,9 @@ export const setParticipantPaid = mutation({
     if (!p) throw new Error("Participante no encontrado");
     const qn = await ctx.db.get(p.quinielaId);
     if (!qn || qn.adminToken !== args.adminToken) throw new Error("No autorizado");
-    await ctx.db.patch(args.participantId, { paid: args.paid });
+    // ausente = no pagó (convención del schema); al desmarcar borramos el campo,
+    // igual que updateNotes con `notes || undefined`.
+    await ctx.db.patch(args.participantId, { paid: args.paid || undefined });
     return { ok: true as const };
   },
 });
