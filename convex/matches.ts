@@ -1,7 +1,6 @@
 // convex/matches.ts
 import { internalMutation, mutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { computeTeamStates, type MatchRow, type TeamRow } from "./lib/tournament";
 
@@ -108,6 +107,9 @@ export const recomputeTeamStates = internalMutation({
   },
 });
 
+// Corrección manual del admin: escribe un override SOLO para su quiniela (tabla
+// matchOverrides). El partido global nunca se toca; cada quiniela ve la verdad de
+// la API con sus propias correcciones encima (derivado en lectura por resolveQuiniela).
 export const setMatchResultManual = mutation({
   args: { adminToken: v.string(), matchExternalId: v.string(),
           homeScore: v.number(), awayScore: v.number(), finished: v.boolean(),
@@ -123,36 +125,32 @@ export const setMatchResultManual = mutation({
       : typeof args.winnerExternalId === "string" ? await teamIdByExternal(ctx, args.winnerExternalId)
       : args.homeScore > args.awayScore ? match.homeTeamId
       : args.awayScore > args.homeScore ? match.awayTeamId : undefined;
-    await ctx.db.patch(match._id, {
+    const fields = {
+      quinielaId: qn._id, matchId: match._id,
       homeScore: args.homeScore, awayScore: args.awayScore,
       status: args.finished ? "finished" : "live",
-      winnerTeamId, manualOverride: true,
-    });
-    await ctx.runMutation(internal.matches.recomputeTeamStates, {});
+      winnerTeamId,
+    };
+    const existing = await ctx.db.query("matchOverrides")
+      .withIndex("by_quiniela_match", (q) => q.eq("quinielaId", qn._id).eq("matchId", match._id)).first();
+    if (existing) await ctx.db.patch(existing._id, fields);
+    else await ctx.db.insert("matchOverrides", fields);
     return { ok: true as const };
   },
 });
 
-/**
- * Inverse of setMatchResultManual: wipes a manually-entered result, returning the
- * match to "scheduled" with no score/winner and releasing manualOverride so the
- * automated sync governs it again. Use to undo a wrongly-entered score.
- */
-export const clearMatchResultManual = mutation({
+// Revertir: borra el override de esa quiniela; el partido vuelve a seguir la API/cron
+// SOLO en esa quiniela. Idempotente si no había override.
+export const clearMatchOverride = mutation({
   args: { adminToken: v.string(), matchExternalId: v.string() },
   handler: async (ctx, args) => {
     const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
     if (!qn) throw new Error("Quiniela no encontrada");
     const match = await ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId)).first();
     if (!match) throw new Error("Partido no encontrado");
-    await ctx.db.patch(match._id, {
-      homeScore: undefined,
-      awayScore: undefined,
-      winnerTeamId: undefined,
-      status: "scheduled",
-      manualOverride: false,
-    });
-    await ctx.runMutation(internal.matches.recomputeTeamStates, {});
+    const existing = await ctx.db.query("matchOverrides")
+      .withIndex("by_quiniela_match", (q) => q.eq("quinielaId", qn._id).eq("matchId", match._id)).first();
+    if (existing) await ctx.db.delete(existing._id);
     return { ok: true as const };
   },
 });

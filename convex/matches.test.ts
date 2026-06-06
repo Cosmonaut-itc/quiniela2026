@@ -75,7 +75,7 @@ describe("seed + recompute", () => {
     expect(stored!.winnerTeamId).toBe(winner!._id);
   });
 
-  it("setMatchResultManual uses an explicit winnerExternalId on a tied knockout", async () => {
+  it("setMatchResultManual guarda un override por quiniela (no toca el partido global)", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.seedFromSnapshot, {});
     const km = await t.run((ctx) =>
@@ -88,7 +88,6 @@ describe("seed + recompute", () => {
         homeScore: null, awayScore: null, status: "scheduled",
         winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null },
     });
-    // create a quiniela so we have a valid adminToken
     const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
     await t.mutation(api.matches.setMatchResultManual, {
       adminToken: q.adminToken, matchExternalId: externalId,
@@ -96,33 +95,15 @@ describe("seed + recompute", () => {
     });
     const winner = await t.run((ctx) =>
       ctx.db.query("teams").withIndex("by_externalId", (q) => q.eq("externalId", "759")).first());
+    // el override de ESTA quiniela lleva el ganador explícito
+    const ovr = await t.run((ctx) =>
+      ctx.db.query("matchOverrides").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).first());
+    expect(ovr!.winnerTeamId).toBe(winner!._id);
+    expect(ovr!.status).toBe("finished");
+    // el partido GLOBAL queda intacto (sigue la API)
     const stored = await t.run((ctx) =>
       ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", externalId)).first());
-    expect(stored!.winnerTeamId).toBe(winner!._id); // explicit winner wins over the tie
-    expect(stored!.manualOverride).toBe(true);
-  });
-
-  it("clearMatchResultManual reverts a manual result to scheduled with no points", async () => {
-    const t = convexTest(schema, modules);
-    await t.mutation(internal.seed.seedFromSnapshot, {});
-    const gm = await t.run((ctx) =>
-      ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "group")).first());
-    const externalId = gm!.externalId;
-    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
-    // enter a 0-0 draw (gives both teams a point), then clear it
-    await t.mutation(api.matches.setMatchResultManual, {
-      adminToken: q.adminToken, matchExternalId: externalId,
-      homeScore: 0, awayScore: 0, finished: true,
-    });
-    await t.mutation(api.matches.clearMatchResultManual, {
-      adminToken: q.adminToken, matchExternalId: externalId,
-    });
-    const stored = await t.run((ctx) =>
-      ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", externalId)).first());
+    expect(stored!.winnerTeamId ?? null).toBeNull();
     expect(stored!.status).toBe("scheduled");
-    expect(stored!.homeScore).toBeUndefined();
-    expect(stored!.awayScore).toBeUndefined();
-    expect(stored!.winnerTeamId).toBeUndefined();
-    expect(stored!.manualOverride).toBe(false);
   });
 });
