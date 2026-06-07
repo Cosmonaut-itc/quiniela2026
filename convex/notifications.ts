@@ -1,4 +1,5 @@
 import { internalMutation, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { NotificationItem, NotificationsData } from "./types";
@@ -17,7 +18,7 @@ export async function insertNotification(ctx: MutationCtx, intent: NotifyIntent)
     .withIndex("by_dedupe", (q) => q.eq("dedupeKey", intent.dedupeKey))
     .first();
   if (dupe) return;
-  await ctx.db.insert("notifications", {
+  const notificationId = await ctx.db.insert("notifications", {
     quinielaId: intent.quinielaId as Id<"quinielas">,
     audience: intent.audience,
     participantId: intent.participantId ? (intent.participantId as Id<"participants">) : undefined,
@@ -29,6 +30,9 @@ export async function insertNotification(ctx: MutationCtx, intent: NotifyIntent)
     createdAt: Date.now(),
     dedupeKey: intent.dedupeKey,
   });
+  // Envío de push en segundo plano (no bloquea la mutación). Si no hay claves VAPID
+  // o suscripciones, la action no hace nada; el aviso in-app ya quedó persistido.
+  await ctx.scheduler.runAfter(0, internal.push.deliver, { notificationId });
 }
 
 const toItem = (n: Doc<"notifications">): NotificationItem => ({
