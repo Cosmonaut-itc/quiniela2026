@@ -170,17 +170,24 @@ describe("eventos por acción", () => {
     expect(adminList.items.some((n) => n.type === "ready_to_distribute")).toBe(true);
   });
 
-  it("closeAndRedistribute avisa quiniela_closed a todos; on_reveal añade teams_assigned", async () => {
+  it("closeAndRedistribute avisa quiniela_closed a todos; on_reveal añade teams_assigned por jugador", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.seedFromSnapshot, {});
     const q = await t.mutation(api.quinielas.createQuiniela, {
       name: "F", prizeText: "$1", numParticipants: 4, assignMode: "on_reveal" });
     const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const b = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Bob" });
     let meList = await t.query(api.notifications.listForParticipant, { personalToken: a.personalToken });
     expect(meList.items.some((n) => n.type === "teams_assigned")).toBe(false); // aún no recibe equipos
     await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
     meList = await t.query(api.notifications.listForParticipant, { personalToken: a.personalToken });
+    const bList = await t.query(api.notifications.listForParticipant, { personalToken: b.personalToken });
+    // cada jugador recibe SU propio cierre + reparto (scoping por participante)
     expect(meList.items.some((n) => n.type === "quiniela_closed")).toBe(true);
     expect(meList.items.some((n) => n.type === "teams_assigned")).toBe(true);
+    expect(bList.items.some((n) => n.type === "quiniela_closed")).toBe(true);
+    expect(bList.items.some((n) => n.type === "teams_assigned")).toBe(true);
+    // el cuerpo refleja un conteo real de equipos, no "0 equipos"
+    expect(meList.items.find((n) => n.type === "teams_assigned")!.body).not.toContain("0 equipo");
   });
 });
