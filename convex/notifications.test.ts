@@ -45,12 +45,13 @@ describe("lectura y marcado de avisos", () => {
       type: "test", title: "Hola", body: "Mundo", createdAt: Date.now(), dedupeKey: "k1",
     }));
     let list = await t.query(api.notifications.listForParticipant, { personalToken });
-    expect(list.items).toHaveLength(1);
-    expect(list.unreadCount).toBe(1);
+    // Desde Task 5, joinQuiniela emite teams_assigned; el test inserta uno adicional "test".
+    expect(list.items.length).toBeGreaterThanOrEqual(1);
+    expect(list.unreadCount).toBeGreaterThanOrEqual(1);
     await t.mutation(api.notifications.markRead, { personalToken });
     list = await t.query(api.notifications.listForParticipant, { personalToken });
     expect(list.unreadCount).toBe(0);
-    expect(list.items[0].read).toBe(true);
+    expect(list.items.every((n) => n.read)).toBe(true);
   });
 
   it("listForAdmin devuelve solo los avisos de audiencia admin de esa quiniela", async () => {
@@ -145,5 +146,41 @@ describe("detectFromSync (cron)", () => {
     await t.mutation(internal.notifications.detectFromSync, {});
     const list = await t.query(api.notifications.listForParticipant, { personalToken: await tokenOf(t, a.quinielaId) });
     expect(list.items.some((n) => n.type === "tournament_started")).toBe(true);
+  });
+});
+
+describe("eventos por acción", () => {
+  it("joinQuiniela avisa al admin (player_joined) y al jugador (teams_assigned en on_join)", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4 });
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const adminList = await t.query(api.notifications.listForAdmin, { adminToken: q.adminToken });
+    expect(adminList.items.some((n) => n.type === "player_joined")).toBe(true);
+    const meList = await t.query(api.notifications.listForParticipant, { personalToken: a.personalToken });
+    expect(meList.items.some((n) => n.type === "teams_assigned")).toBe(true);
+  });
+
+  it("ready_to_distribute cuando la quiniela se llena", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 1 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const adminList = await t.query(api.notifications.listForAdmin, { adminToken: q.adminToken });
+    expect(adminList.items.some((n) => n.type === "ready_to_distribute")).toBe(true);
+  });
+
+  it("closeAndRedistribute avisa quiniela_closed a todos; on_reveal añade teams_assigned", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "F", prizeText: "$1", numParticipants: 4, assignMode: "on_reveal" });
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    let meList = await t.query(api.notifications.listForParticipant, { personalToken: a.personalToken });
+    expect(meList.items.some((n) => n.type === "teams_assigned")).toBe(false); // aún no recibe equipos
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    meList = await t.query(api.notifications.listForParticipant, { personalToken: a.personalToken });
+    expect(meList.items.some((n) => n.type === "quiniela_closed")).toBe(true);
+    expect(meList.items.some((n) => n.type === "teams_assigned")).toBe(true);
   });
 });

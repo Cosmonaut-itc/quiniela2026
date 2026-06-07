@@ -7,6 +7,8 @@ import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/di
 import { teamLite, photoUrl, prizeView } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { OverviewData, PlayerStatus, AdminData, AssignMode } from "./types";
+import { insertNotification } from "./notifications";
+import { quinielaClosedNotice, teamsAssignedNotice } from "./lib/notify";
 
 /** Normalizes the stored (optional) assignMode; legacy rows without it are on_join. */
 const modeOf = (qn: Doc<"quinielas">): AssignMode =>
@@ -37,6 +39,18 @@ async function redistributeAndLock(
     }
   }
   await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });
+
+  // Avisos: la quiniela se cerró (a todos); en on_reveal recién recibieron equipos.
+  const isReveal = modeOf(qn) === "on_reveal";
+  const finalOwned = await ctx.db.query("ownerships")
+    .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+  for (const p of participants) {
+    await insertNotification(ctx, quinielaClosedNotice(qn._id, p._id));
+    if (isReveal) {
+      const teamCount = finalOwned.filter((o) => o.participantId === p._id).length;
+      await insertNotification(ctx, teamsAssignedNotice(qn._id, p._id, teamCount));
+    }
+  }
 }
 
 export const generateUploadUrl = mutation({

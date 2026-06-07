@@ -7,6 +7,8 @@ import { teamLite, photoUrl, prizeView } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { Id } from "./_generated/dataModel";
 import type { PersonalData, PlayerStatus } from "./types";
+import { insertNotification } from "./notifications";
+import { playerJoinedNotice, teamsAssignedNotice, readyToDistributeNotice } from "./lib/notify";
 
 export const joinQuiniela = mutation({
   args: { joinToken: v.string(), name: v.string(), photoId: v.optional(v.id("_storage")) },
@@ -19,14 +21,16 @@ export const joinQuiniela = mutation({
     const k = participants.length;
     if (k >= qn.numParticipants) throw new Error("Ya no hay lugares disponibles");
 
+    const name = args.name.trim().slice(0, 40);
     const personalToken = newToken();
     const participantId = await ctx.db.insert("participants", {
-      quinielaId: qn._id, name: args.name.trim().slice(0, 40),
+      quinielaId: qn._id, name,
       photoId: args.photoId, personalToken, slotIndex: k, joinedAt: Date.now(),
     });
 
     // on_reveal: no teams until the admin reveals. on_join (default): draw a slot-sized
     // batch from the still-unowned pool right now.
+    let assignedCount = 0;
     if (qn.assignMode !== "on_reveal") {
       const size = qn.slotSizes[k];
       const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
@@ -37,7 +41,14 @@ export const joinQuiniela = mutation({
       for (const teamId of picked) {
         await ctx.db.insert("ownerships", { quinielaId: qn._id, teamId, participantId });
       }
+      assignedCount = picked.length;
     }
+
+    // Avisos: al admin (alguien se unió) y, si recibió equipos, al jugador. Si se llenó, al admin.
+    await insertNotification(ctx, playerJoinedNotice(qn._id, name, participantId));
+    if (assignedCount > 0) await insertNotification(ctx, teamsAssignedNotice(qn._id, participantId, assignedCount));
+    if (k + 1 >= qn.numParticipants) await insertNotification(ctx, readyToDistributeNotice(qn._id));
+
     return { personalToken };
   },
 });
