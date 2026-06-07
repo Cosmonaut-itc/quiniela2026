@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { readStoredToken, persistToken } from "@/lib/storage";
 
 /**
  * Mobile-first page shell for the whole app: a centered ~28rem column on a
@@ -32,30 +33,6 @@ export function Shell({
 }
 
 type NavKey = "me" | "general" | "mundial";
-
-/**
- * Reads a persisted nav token for a quiniela. Some browsers (e.g. Safari
- * private mode) throw a SecurityError on localStorage access even when the
- * object is defined, so guard the read and fall back to null.
- */
-function readStoredToken(id: string, kind: "me" | "join"): string | null {
-  try {
-    if (typeof localStorage === "undefined") return null;
-    return localStorage.getItem(`quiniela:${id}:${kind}`);
-  } catch {
-    return null;
-  }
-}
-
-/** Persists a nav token so tokenless routes (e.g. Mundial) can still link to it. */
-function persistToken(id: string, kind: "me" | "join", value: string) {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(`quiniela:${id}:${kind}`, value);
-  } catch {
-    // private mode / disabled storage — non-fatal, fall back to prop-only nav
-  }
-}
 
 /**
  * Sticky bottom navigation matching the 3-tab wireframe
