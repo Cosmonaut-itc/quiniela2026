@@ -27,3 +27,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </ConvexProvider>
   </React.StrictMode>,
 );
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* push opcional: si falla el registro, la app sigue funcionando in-app */
+    });
+  });
+}
