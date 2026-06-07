@@ -90,7 +90,7 @@ export default function Join() {
       }
     >
       {/* Header */}
-      <header className="grain bg-pitch relative -mx-4 -mt-5 overflow-hidden rounded-b-3xl border-b border-border px-4 pt-8 pb-6">
+      <header className="grain bg-pitch header-safe relative -mx-4 overflow-hidden rounded-b-3xl border-b border-border px-4 pb-6">
         <div className="flex items-center gap-3.5">
           {quiniela.photoUrl ? (
             <img

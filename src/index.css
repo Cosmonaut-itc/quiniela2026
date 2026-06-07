@@ -176,6 +176,21 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+  /*
+   * iOS standalone safe area. `env(safe-area-inset-top)` is 0 on desktop/Android
+   * (and in non-standalone Safari), so these collapse to the previous spacing
+   * (pt-5 / -mt-5 / pt-8) everywhere except an installed iOS PWA, where they
+   * keep content clear of the status bar / notch instead of being clipped.
+   */
+  .pt-safe-top {
+    padding-top: calc(1.25rem + env(safe-area-inset-top));
+  }
+  /* Full-bleed headers cancel the Shell's safe-area top so they fill the space
+     behind the status bar, then re-pad their own content below it. */
+  .header-safe {
+    margin-top: calc(-1.25rem - env(safe-area-inset-top));
+    padding-top: calc(2rem + env(safe-area-inset-top));
+  }
 }
 
 @keyframes rise-in {
