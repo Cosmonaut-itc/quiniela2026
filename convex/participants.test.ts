@@ -143,3 +143,61 @@ describe("setParticipantPaid", () => {
     expect(admin.participants[0].paid).toBe(true);
   });
 });
+
+describe("updateParticipantPhoto", () => {
+  it("updates the participant's photo and deletes the previous one", async () => {
+    const { t, q } = await setup(4);
+    const oldPhotoId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["old"], { type: "image/png" })));
+    const a = await t.mutation(api.participants.joinQuiniela, {
+      joinToken: q.joinToken, name: "Ana", photoId: oldPhotoId,
+    });
+    const newPhotoId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["new"], { type: "image/png" })));
+
+    await t.mutation(api.participants.updateParticipantPhoto, {
+      personalToken: a.personalToken, photoId: newPhotoId,
+    });
+
+    const p = await t.run((ctx) =>
+      ctx.db.query("participants")
+        .withIndex("by_personalToken", (x) => x.eq("personalToken", a.personalToken))
+        .first());
+    expect(p?.photoId).toBe(newPhotoId);
+    const oldUrl = await t.run((ctx) => ctx.storage.getUrl(oldPhotoId));
+    expect(oldUrl).toBeNull(); // la anterior se borró del storage
+  });
+
+  it("sets a photo for a participant that had none (no delete attempted)", async () => {
+    const { t, q } = await setup(4);
+    const a = await t.mutation(api.participants.joinQuiniela, {
+      joinToken: q.joinToken, name: "Ana",
+    });
+    const photoId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["new"], { type: "image/png" })));
+
+    await t.mutation(api.participants.updateParticipantPhoto, {
+      personalToken: a.personalToken, photoId,
+    });
+
+    const p = await t.run((ctx) =>
+      ctx.db.query("participants")
+        .withIndex("by_personalToken", (x) => x.eq("personalToken", a.personalToken))
+        .first());
+    expect(p?.photoId).toBe(photoId);
+    // la nueva foto sigue existiendo (no se borró nada)
+    const url = await t.run((ctx) => ctx.storage.getUrl(photoId));
+    expect(url).not.toBeNull();
+  });
+
+  it("rejects an invalid personalToken", async () => {
+    const { t } = await setup(4);
+    const photoId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["x"], { type: "image/png" })));
+    await expect(
+      t.mutation(api.participants.updateParticipantPhoto, {
+        personalToken: "nope", photoId,
+      }),
+    ).rejects.toThrow();
+  });
+});

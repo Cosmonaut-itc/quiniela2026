@@ -68,6 +68,30 @@ export const setParticipantPaid = mutation({
   },
 });
 
+export const updateParticipantPhoto = mutation({
+  args: { personalToken: v.string(), photoId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    const me = await ctx.db
+      .query("participants")
+      .withIndex("by_personalToken", (q) => q.eq("personalToken", args.personalToken))
+      .first();
+    if (!me) throw new Error("Jugador no encontrado");
+    const oldPhotoId = me.photoId;
+    await ctx.db.patch(me._id, { photoId: args.photoId });
+    // La actualización del photoId ya quedó hecha arriba. El borrado de la foto
+    // anterior es limpieza best-effort: si falla, preferimos dejar un blob huérfano
+    // antes que revertir la mutación (transaccional) y perder el cambio del usuario.
+    if (oldPhotoId && oldPhotoId !== args.photoId) {
+      try {
+        await ctx.storage.delete(oldPhotoId);
+      } catch {
+        console.warn("updateParticipantPhoto: no se pudo borrar la foto anterior", oldPhotoId);
+      }
+    }
+    return { ok: true as const };
+  },
+});
+
 export const getPersonalPanel = query({
   args: { personalToken: v.string() },
   handler: async (ctx, args): Promise<PersonalData> => {
