@@ -21,6 +21,12 @@ describe("PWA manifest — iOS standalone navigation", () => {
   it("stays in standalone display mode", () => {
     expect(manifest.display).toBe("standalone");
   });
+
+  it("links a manifest at runtime so the dynamic blob can rebind its href", () => {
+    // syncManifestLink() reapunta este <link> a un manifest con start_url por
+    // ruta; si desaparece, la PWA volvería a abrir siempre en "/".
+    expect(indexHtml).toMatch(/<link[^>]*rel="manifest"[^>]*>/);
+  });
 });
 
 describe("index.html — iOS standalone head", () => {

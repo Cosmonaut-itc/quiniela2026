@@ -4,6 +4,7 @@ import { ConvexProvider } from "convex/react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { convex } from "@/lib/convex";
+import { ManifestSync } from "@/components/ManifestSync";
 import Home from "@/routes/Home";
 import Join from "@/routes/Join";
 import Personal from "@/routes/Personal";
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ConvexProvider client={convex}>
       <BrowserRouter>
+        <ManifestSync />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/q/:id/join/:token" element={<Join />} />
