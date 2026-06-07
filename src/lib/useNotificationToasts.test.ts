@@ -34,4 +34,24 @@ describe("useNotificationToasts", () => {
     rerender({ items: [item("1", 100)] });
     expect(toast).not.toHaveBeenCalled(); // primera vez con datos: solo fija el corte, sin toasts
   });
+
+  it("no falla si localStorage lanza (p. ej. modo privado)", () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get() { throw new Error("Storage unavailable"); },
+    });
+    try {
+      expect(() => {
+        const { rerender } = renderHook(
+          ({ items }: { items: Item[] }) => useNotificationToasts("Q", "me", items),
+          { initialProps: { items: [item("1", 100)] as Item[] } });
+        rerender({ items: [item("2", 200), item("1", 100)] });
+      }).not.toThrow();
+      // Sin watermark persistente cada render cuenta como "primera vez" → degrada a sin toasts.
+      expect(toast).not.toHaveBeenCalled();
+    } finally {
+      if (original) Object.defineProperty(globalThis, "localStorage", original);
+    }
+  });
 });
