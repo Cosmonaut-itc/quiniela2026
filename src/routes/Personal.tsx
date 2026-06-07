@@ -80,8 +80,8 @@ export default function Personal() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-start">
-            <NotificationBell quinielaId={id!} token={token!} kind="me" />
             <StatusBadge status={me.status} label={statusLabel} />
+            <NotificationBell quinielaId={id!} token={token!} kind="me" />
           </div>
         </div>
         {(() => {
