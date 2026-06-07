@@ -2,30 +2,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// These tests guard the iOS standalone PWA contract. iOS does NOT apply the
-// spec default `scope: "/"` — omitting it makes every in-app navigation break
-// out into the modal Safari browser (and that breakout is the flaky, "tap it
-// several times" navigation). It also needs viewport-fit + apple meta tags so
-// the header can sit under the status bar instead of being clipped by it.
+// Estas pruebas blindan el contrato PWA de iOS. El manifest se inyecta como blob
+// por ruta (ver pwaManifest.ts / ManifestSync), NO como archivo estático: un
+// `start_url` estático "/" hacía que iOS cacheara ese manifest y abriera la PWA
+// en la página de crear quiniela sin importar desde dónde se instalara.
+// Además iOS necesita viewport-fit + meta tags apple para el standalone y el notch.
 const root = resolve(import.meta.dirname, "..");
-const manifest = JSON.parse(
-  readFileSync(resolve(root, "public/manifest.webmanifest"), "utf8"),
-);
 const indexHtml = readFileSync(resolve(root, "index.html"), "utf8");
 
-describe("PWA manifest — iOS standalone navigation", () => {
-  it("declares an explicit '/' scope (iOS ignores the spec default)", () => {
-    expect(manifest.scope).toBe("/");
-  });
-
-  it("stays in standalone display mode", () => {
-    expect(manifest.display).toBe("standalone");
-  });
-
-  it("links a manifest at runtime so the dynamic blob can rebind its href", () => {
-    // syncManifestLink() reapunta este <link> a un manifest con start_url por
-    // ruta; si desaparece, la PWA volvería a abrir siempre en "/".
+describe("PWA manifest — inyección dinámica por ruta", () => {
+  it("declara un <link rel=manifest> que ManifestSync reapunta a un blob", () => {
     expect(indexHtml).toMatch(/<link[^>]*rel="manifest"[^>]*>/);
+  });
+
+  it("NO sirve un manifest estático (iOS cachearía start_url='/' y abriría mal)", () => {
+    // El href estático lo precarga/cachea iOS antes de que el JS lo cambie, así
+    // que la PWA abría en "/". Sin archivo estático no hay a qué engancharse.
+    expect(indexHtml).not.toContain("manifest.webmanifest");
   });
 });
 

@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Sin href estático a propósito: ManifestSync lo apunta a un blob con
+         start_url = ruta actual. Un manifest estático con start_url "/" lo
+         cachea iOS y abriría la PWA en crear-quiniela sin importar desde dónde
+         se instale (en algunos iPhone se quedaba con ese, no con el blob). -->
+    <link rel="manifest" />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <!-- iOS standalone: sin estos meta tags iOS no trata la app como PWA de
