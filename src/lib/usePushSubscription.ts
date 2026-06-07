@@ -48,6 +48,9 @@ export function usePushSubscription(args: { personalToken?: string; adminToken?:
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC!),
       });
       const json = sub.toJSON();
+      if (!json.keys?.p256dh || !json.keys?.auth) {
+        throw new Error("Faltan las claves de la suscripción push");
+      }
       await save({ ...args, endpoint: sub.endpoint, p256dh: json.keys!.p256dh, auth: json.keys!.auth });
       setEnabled(true);
     } finally {

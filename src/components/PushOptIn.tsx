@@ -16,10 +16,18 @@ export function PushOptIn({ personalToken, adminToken }: { personalToken?: strin
     );
   }
 
+  async function toggle() {
+    try {
+      await (enabled ? disable() : enable());
+    } catch (err) {
+      console.error("Error al cambiar la suscripción de avisos:", err);
+    }
+  }
+
   return (
     <button
       type="button"
-      onClick={() => void (enabled ? disable() : enable())}
+      onClick={() => void toggle()}
       disabled={busy}
       className="mt-3 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary disabled:opacity-50"
     >
