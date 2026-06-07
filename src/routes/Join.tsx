@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
-import { readStoredToken } from "@/lib/storage";
+import { readStoredToken, persistToken } from "@/lib/storage";
 import { PlayerRow } from "@/components/PlayerRow";
 import { DuelRow } from "@/components/DuelRow";
 import { Shell, BottomNav } from "@/components/Shell";
@@ -73,7 +73,7 @@ export default function Join() {
         name,
         photoId: photoId as Id<"_storage"> | undefined,
       });
-      localStorage.setItem(`quiniela:${id}:me`, res.personalToken);
+      persistToken(id!, "me", res.personalToken);
       nav(`/q/${id}/me/${res.personalToken}`);
     } finally {
       setBusy(false);
