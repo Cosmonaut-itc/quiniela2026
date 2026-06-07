@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
+import { readStoredToken } from "@/lib/storage";
 import { PlayerRow } from "@/components/PlayerRow";
 import { DuelRow } from "@/components/DuelRow";
 import { Shell, BottomNav } from "@/components/Shell";
@@ -58,6 +59,9 @@ export default function Join() {
 
   const { quiniela } = data;
   const canJoin = quiniela.status === "open" && data.freeSlots > 0;
+
+  // "Ya inscrito en este dispositivo" = existe el token de participante en localStorage.
+  const alreadyJoined = !!id && !!readStoredToken(id, "me");
 
   async function submit() {
     if (!name.trim()) return;
@@ -176,72 +180,73 @@ export default function Join() {
         <span className="text-muted-foreground">→</span>
       </Link>
 
-      {/* Join CTA */}
-      {canJoin ? (
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger
-            render={
-              <Button
-                size="lg"
-                className="glow-primary mt-6 h-12 w-full rounded-2xl text-base font-bold"
-              />
-            }
-          >
-            ⚽ Unirme a la quiniela
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Unirte a {quiniela.name}</DialogTitle>
-              <DialogDescription>
-                Te tocarán equipos al azar. Quedan {data.freeSlots}{" "}
-                {data.freeSlots === 1 ? "lugar" : "lugares"}.
-              </DialogDescription>
-            </DialogHeader>
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submit();
-              }}
+      {/* Join CTA — oculto si ya estás inscrito en este dispositivo */}
+      {!alreadyJoined &&
+        (canJoin ? (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger
+              render={
+                <Button
+                  size="lg"
+                  className="glow-primary mt-6 h-12 w-full rounded-2xl text-base font-bold"
+                />
+              }
             >
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="join-name">Tu nombre</Label>
-                <Input
-                  id="join-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ej. María"
-                  maxLength={40}
-                  autoFocus
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="join-photo">Foto (opcional)</Label>
-                <Input
-                  id="join-photo"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-              </div>
-              <Button
-                type="submit"
-                size="lg"
-                className="h-11 rounded-xl font-bold"
-                disabled={busy || uploading || !name.trim()}
+              ⚽ Unirme a la quiniela
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Unirte a {quiniela.name}</DialogTitle>
+                <DialogDescription>
+                  Te tocarán equipos al azar. Quedan {data.freeSlots}{" "}
+                  {data.freeSlots === 1 ? "lugar" : "lugares"}.
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                className="flex flex-col gap-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void submit();
+                }}
               >
-                {busy || uploading ? "Entrando…" : "Confirmar inscripción"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <div className="mt-6 rounded-2xl border border-border bg-card px-4 py-3.5 text-center text-sm text-muted-foreground">
-          {quiniela.status === "open"
-            ? "No quedan lugares disponibles."
-            : "Las inscripciones ya están cerradas."}
-        </div>
-      )}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="join-name">Tu nombre</Label>
+                  <Input
+                    id="join-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej. María"
+                    maxLength={40}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="join-photo">Foto (opcional)</Label>
+                  <Input
+                    id="join-photo"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-11 rounded-xl font-bold"
+                  disabled={busy || uploading || !name.trim()}
+                >
+                  {busy || uploading ? "Entrando…" : "Confirmar inscripción"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-border bg-card px-4 py-3.5 text-center text-sm text-muted-foreground">
+            {quiniela.status === "open"
+              ? "No quedan lugares disponibles."
+              : "Las inscripciones ya están cerradas."}
+          </div>
+        ))}
     </Shell>
   );
 }
