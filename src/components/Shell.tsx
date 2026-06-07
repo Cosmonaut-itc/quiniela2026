@@ -20,7 +20,7 @@ export function Shell({
     <div className="relative min-h-svh w-full">
       <div
         className={cn(
-          "mx-auto w-full max-w-md px-4 pt-5",
+          "pt-safe-top mx-auto w-full max-w-md px-4",
           bottomNav ? "pb-28" : "pb-12",
           className,
         )}

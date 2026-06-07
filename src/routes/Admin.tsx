@@ -6,6 +6,7 @@ import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { Shell } from "@/components/Shell";
 import { NotificationBell } from "@/components/NotificationBell";
+import { PushOptIn } from "@/components/PushOptIn";
 import { SectionHeading } from "@/components/bits";
 import { formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -220,6 +221,8 @@ export default function Admin() {
           Comparte este link para que cualquiera se inscriba.
         </p>
       </div>
+
+      <PushOptIn adminToken={token!} />
 
       {/* Notes editor */}
       <SectionHeading>Notas</SectionHeading>

@@ -1,4 +1,5 @@
-import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { NotificationItem, NotificationsData } from "./types";
@@ -17,7 +18,7 @@ export async function insertNotification(ctx: MutationCtx, intent: NotifyIntent)
     .withIndex("by_dedupe", (q) => q.eq("dedupeKey", intent.dedupeKey))
     .first();
   if (dupe) return;
-  await ctx.db.insert("notifications", {
+  const notificationId = await ctx.db.insert("notifications", {
     quinielaId: intent.quinielaId as Id<"quinielas">,
     audience: intent.audience,
     participantId: intent.participantId ? (intent.participantId as Id<"participants">) : undefined,
@@ -29,6 +30,9 @@ export async function insertNotification(ctx: MutationCtx, intent: NotifyIntent)
     createdAt: Date.now(),
     dedupeKey: intent.dedupeKey,
   });
+  // Envío de push en segundo plano (no bloquea la mutación). Si no hay claves VAPID
+  // o suscripciones, la action no hace nada; el aviso in-app ya quedó persistido.
+  await ctx.scheduler.runAfter(0, internal.push.deliver, { notificationId });
 }
 
 const toItem = (n: Doc<"notifications">): NotificationItem => ({
@@ -154,5 +158,89 @@ export const detectFromSync = internalMutation({
       });
       for (const intent of intents) await insertNotification(ctx, intent);
     }
+  },
+});
+
+async function recipientFromToken(ctx: MutationCtx, personalToken?: string, adminToken?: string) {
+  if (personalToken) {
+    const me = await ctx.db.query("participants")
+      .withIndex("by_personalToken", (q) => q.eq("personalToken", personalToken)).first();
+    if (!me) throw new Error("Jugador no encontrado");
+    return { quinielaId: me.quinielaId, audience: "participant" as const, participantId: me._id };
+  }
+  if (adminToken) {
+    const qn = await ctx.db.query("quinielas")
+      .withIndex("by_adminToken", (q) => q.eq("adminToken", adminToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    return { quinielaId: qn._id, audience: "admin" as const, participantId: undefined };
+  }
+  throw new Error("Falta token");
+}
+
+export const savePushSubscription = mutation({
+  args: {
+    personalToken: v.optional(v.string()), adminToken: v.optional(v.string()),
+    endpoint: v.string(), p256dh: v.string(), auth: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const r = await recipientFromToken(ctx, args.personalToken, args.adminToken);
+    const fields = {
+      quinielaId: r.quinielaId, audience: r.audience, participantId: r.participantId,
+      endpoint: args.endpoint, p256dh: args.p256dh, auth: args.auth, createdAt: Date.now(),
+    };
+    const existing = await ctx.db.query("pushSubscriptions")
+      .withIndex("by_endpoint", (q) => q.eq("endpoint", args.endpoint)).first();
+    if (existing) await ctx.db.patch(existing._id, fields);
+    else await ctx.db.insert("pushSubscriptions", fields);
+    return { ok: true as const };
+  },
+});
+
+export const removePushSubscription = mutation({
+  args: { endpoint: v.string() },
+  handler: async (ctx, { endpoint }) => {
+    const existing = await ctx.db.query("pushSubscriptions")
+      .withIndex("by_endpoint", (q) => q.eq("endpoint", endpoint)).first();
+    if (existing) await ctx.db.delete(existing._id);
+    return { ok: true as const };
+  },
+});
+
+export const pruneSubscriptions = internalMutation({
+  args: { endpoints: v.array(v.string()) },
+  handler: async (ctx, { endpoints }) => {
+    for (const e of endpoints) {
+      const s = await ctx.db.query("pushSubscriptions")
+        .withIndex("by_endpoint", (q) => q.eq("endpoint", e)).first();
+      if (s) await ctx.db.delete(s._id);
+    }
+  },
+});
+
+/** Datos para enviar push de un aviso: copy, URL de deep-link y suscripciones del destinatario. */
+export const getForPush = internalQuery({
+  args: { notificationId: v.id("notifications") },
+  handler: async (ctx, { notificationId }) => {
+    const n = await ctx.db.get(notificationId);
+    if (!n) return null;
+    let url = `/q/${n.quinielaId}`;
+    let subs: Doc<"pushSubscriptions">[];
+    if (n.audience === "admin") {
+      const qn = await ctx.db.get(n.quinielaId);
+      if (qn) url = `/q/${n.quinielaId}/admin/${qn.adminToken}`;
+      subs = await ctx.db.query("pushSubscriptions")
+        .withIndex("by_quiniela_audience", (q) => q.eq("quinielaId", n.quinielaId).eq("audience", "admin")).collect();
+    } else if (n.participantId) {
+      const me = await ctx.db.get(n.participantId);
+      if (me) url = `/q/${n.quinielaId}/me/${me.personalToken}`;
+      subs = await ctx.db.query("pushSubscriptions")
+        .withIndex("by_participant", (q) => q.eq("participantId", n.participantId!)).collect();
+    } else {
+      subs = [];
+    }
+    return {
+      title: n.title, body: n.body, url,
+      subscriptions: subs.map((s) => ({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
+    };
   },
 });
