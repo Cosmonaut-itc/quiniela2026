@@ -19,5 +19,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.test.{ts,tsx}", "convex/**/*.test.ts"],
+    environmentOptions: {
+      jsdom: {
+        // localStorage requiere un origen no opaco (jsdom default es about:blank).
+        url: "http://localhost",
+      },
+    },
   },
 });

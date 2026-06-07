@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { Shell } from "@/components/Shell";
+import { NotificationBell } from "@/components/NotificationBell";
 import { SectionHeading } from "@/components/bits";
 import { formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -187,6 +188,9 @@ export default function Admin() {
         <h1 className="mt-1 truncate font-heading text-2xl font-extrabold tracking-tight">
           {quiniela.name}
         </h1>
+        <div className="absolute top-6 right-4">
+          <NotificationBell quinielaId={id!} token={token!} kind="admin" />
+        </div>
       </header>
 
       {/* Invite link card */}

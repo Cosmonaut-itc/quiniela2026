@@ -4,6 +4,7 @@ import { api } from "@/../convex/_generated/api";
 import { Avatar } from "@/components/Avatar";
 import { TeamCard } from "@/components/TeamCard";
 import { StatusBadge } from "@/components/StatusBadge";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -78,11 +79,10 @@ export default function Personal() {
               </p>
             </div>
           </div>
-          <StatusBadge
-            status={me.status}
-            label={statusLabel}
-            className="shrink-0 self-start"
-          />
+          <div className="flex shrink-0 items-center gap-2 self-start">
+            <NotificationBell quinielaId={id!} token={token!} kind="me" />
+            <StatusBadge status={me.status} label={statusLabel} />
+          </div>
         </div>
         {(() => {
           const b = prizeBanner(data.prize, data.status, " — para el dueño del campeón");
