@@ -1,5 +1,8 @@
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
+import { useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { toast } from "sonner";
+import { usePhotoUpload } from "@/lib/usePhotoUpload";
 import { api } from "@/../convex/_generated/api";
 import { Avatar } from "@/components/Avatar";
 import { TeamCard } from "@/components/TeamCard";
@@ -36,6 +39,26 @@ export default function Personal() {
     personalToken: token!,
   });
 
+  const { upload } = usePhotoUpload();
+  const updatePhoto = useMutation(api.participants.updateParticipantPhoto);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function changePhoto(file: File) {
+    setSaving(true);
+    try {
+      const photoId = await upload(file);
+      // Si updatePhoto falla tras subir, el blob queda huérfano (costo mínimo);
+      // mismo tradeoff del patrón de subida en Join/Home.
+      await updatePhoto({ personalToken: token!, photoId });
+      toast.success("Foto actualizada");
+    } catch {
+      toast.error("No se pudo actualizar la foto");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (data === undefined) return <LoadingState />;
 
   const { me } = data;
@@ -63,12 +86,39 @@ export default function Personal() {
       <header className="grain bg-pitch relative -mx-4 -mt-5 overflow-hidden rounded-b-3xl border-b border-border px-4 pt-8 pb-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div
-              className={
-                me.status === "champion" ? "gold-ring rounded-full" : undefined
-              }
-            >
-              <Avatar name={me.name} url={me.photoUrl} size={48} />
+            <div className="relative shrink-0">
+              <div
+                className={
+                  me.status === "champion" ? "gold-ring rounded-full" : undefined
+                }
+              >
+                <Avatar name={me.name} url={me.photoUrl} size={48} />
+              </div>
+              {saving && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/60">
+                  <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={saving}
+                aria-label="Cambiar foto"
+                className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background transition-opacity disabled:opacity-60 before:absolute before:inset-[-10px] before:content-['']"
+              >
+                <span className="text-[0.7rem] leading-none">📷</span>
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void changePhoto(f);
+                  e.target.value = ""; // permite re-elegir el mismo archivo
+                }}
+              />
             </div>
             <div className="min-w-0">
               <h1 className="truncate font-heading text-2xl font-extrabold tracking-tight">
