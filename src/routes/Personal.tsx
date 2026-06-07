@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { TeamCard } from "@/components/TeamCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NotificationBell } from "@/components/NotificationBell";
+import { PushOptIn } from "@/components/PushOptIn";
 import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,6 +90,8 @@ export default function Personal() {
           return b ? <PrizeBanner title={b.title} subline={b.subline} /> : null;
         })()}
       </header>
+
+      <PushOptIn personalToken={token!} />
 
       {me.status === "pending" && (
         <div className="grain animate-rise relative mt-6 overflow-hidden rounded-3xl border border-border bg-card px-5 py-8 text-center">
