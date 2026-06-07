@@ -74,6 +74,19 @@ describe("getPersonalPanel", () => {
     expect(panel.me.status).toBe("alive");
   });
 
+  it("ordena mis equipos alfabéticamente por nombre", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    // 2 participantes → ~24 equipos cada uno: el orden de asignación no es
+    // alfabético por azar, así que el assert falla sin el ordenamiento.
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const panel = await t.query(api.participants.getPersonalPanel, { personalToken: a.personalToken });
+    const names = panel.teams.map((x) => x.team.name);
+    expect(names.length).toBeGreaterThan(1);
+    expect(names).toEqual([...names].sort((x, y) => x.localeCompare(y)));
+  });
+
   it("reports pending status before the reveal in on_reveal mode", async () => {
     const t = convexTest(schema, import.meta.glob("./**/*.*s"));
     await t.mutation(internal.seed.seedFromSnapshot, {});

@@ -164,7 +164,9 @@ export const getPersonalPanel = query({
       joinToken: qn.joinToken,
       me: { name: me.name, photoUrl: await photoUrl(ctx, me.photoId), status, aliveCount, totalCount: teamsOut.length },
       playingNow,
-      teams: teamsOut,
+      // "Mis equipos" siempre en orden alfabético (copia: no altera el orden de
+      // `teamsOut` del que deriva `playingNow`).
+      teams: [...teamsOut].sort((a, b) => a.team.name.localeCompare(b.team.name)),
     };
   },
 });
