@@ -13,6 +13,7 @@ import type * as lib_distribution from "../lib/distribution.js";
 import type * as lib_footballData from "../lib/footballData.js";
 import type * as lib_notify from "../lib/notify.js";
 import type * as lib_perQuiniela from "../lib/perQuiniela.js";
+import type * as lib_push from "../lib/push.js";
 import type * as lib_resolve from "../lib/resolve.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "lib/footballData": typeof lib_footballData;
   "lib/notify": typeof lib_notify;
   "lib/perQuiniela": typeof lib_perQuiniela;
+  "lib/push": typeof lib_push;
   "lib/resolve": typeof lib_resolve;
   "lib/tokens": typeof lib_tokens;
   "lib/tournament": typeof lib_tournament;

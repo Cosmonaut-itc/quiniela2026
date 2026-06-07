@@ -191,3 +191,29 @@ describe("eventos por acción", () => {
     expect(meList.items.find((n) => n.type === "teams_assigned")!.body).not.toContain("0 equipo");
   });
 });
+
+describe("suscripciones push", () => {
+  it("guarda (upsert por endpoint) y borra una suscripción del jugador", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4 });
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.mutation(api.notifications.savePushSubscription, {
+      personalToken: a.personalToken, endpoint: "https://push/x", p256dh: "k", auth: "s" });
+    await t.mutation(api.notifications.savePushSubscription, {
+      personalToken: a.personalToken, endpoint: "https://push/x", p256dh: "k2", auth: "s2" }); // upsert
+    let subs = await t.run((ctx) => ctx.db.query("pushSubscriptions").collect());
+    expect(subs).toHaveLength(1);
+    expect(subs[0].p256dh).toBe("k2");
+    await t.mutation(api.notifications.removePushSubscription, { endpoint: "https://push/x" });
+    subs = await t.run((ctx) => ctx.db.query("pushSubscriptions").collect());
+    expect(subs).toHaveLength(0);
+  });
+
+  it("savePushSubscription lanza con token inválido", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    await expect(t.mutation(api.notifications.savePushSubscription, {
+      personalToken: "no", endpoint: "e", p256dh: "k", auth: "s" })).rejects.toThrow();
+  });
+});

@@ -111,4 +111,18 @@ export default defineSchema({
     .index("by_participant", ["participantId", "createdAt"])
     .index("by_quiniela_audience", ["quinielaId", "audience", "createdAt"])
     .index("by_dedupe", ["dedupeKey"]),
+
+  // Suscripción de Web Push (anónima del navegador), atada a un participante o al admin.
+  pushSubscriptions: defineTable({
+    quinielaId: v.id("quinielas"),
+    audience: v.string(), // "participant" | "admin"
+    participantId: v.optional(v.id("participants")),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_participant", ["participantId"])
+    .index("by_quiniela_audience", ["quinielaId", "audience"])
+    .index("by_endpoint", ["endpoint"]),
 });
