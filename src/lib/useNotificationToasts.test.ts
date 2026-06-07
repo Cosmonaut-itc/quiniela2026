@@ -25,4 +25,13 @@ describe("useNotificationToasts", () => {
     renderHook(() => useNotificationToasts("Q", "me", undefined));
     expect(toast).not.toHaveBeenCalled();
   });
+
+  it("la transición de carga (undefined → datos) no repite el historial", () => {
+    const { rerender } = renderHook(
+      ({ items }: { items: Item[] | undefined }) => useNotificationToasts("Q", "me", items),
+      { initialProps: { items: undefined as Item[] | undefined } });
+    expect(toast).not.toHaveBeenCalled();
+    rerender({ items: [item("1", 100)] });
+    expect(toast).not.toHaveBeenCalled(); // primera vez con datos: solo fija el corte, sin toasts
+  });
 });

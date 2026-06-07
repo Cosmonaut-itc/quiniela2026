@@ -185,7 +185,7 @@ export default function Admin() {
         <p className="text-xs font-bold tracking-[0.2em] text-gold uppercase">
           Panel de administración
         </p>
-        <h1 className="mt-1 truncate font-heading text-2xl font-extrabold tracking-tight">
+        <h1 className="mt-1 truncate pr-12 font-heading text-2xl font-extrabold tracking-tight">
           {quiniela.name}
         </h1>
         <div className="absolute top-6 right-4">

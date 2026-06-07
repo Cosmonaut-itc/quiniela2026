@@ -9,26 +9,36 @@
 if (typeof document !== "undefined") {
   await import("@testing-library/jest-dom");
 
-  // Node 26 exposes `localStorage` / `sessionStorage` as undefined getters in
-  // globalThis (needs --localstorage-file to work). vitest's populateGlobal()
-  // skips keys already present in the host global, so jsdom's Storage objects
-  // never reach the test VM context. Fix: pull them from the internal jsdom
-  // instance that vitest conveniently exposes as `global.jsdom`.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const jsdomInst = (globalThis as any).jsdom;
-  if (jsdomInst?.window?._localStorage !== undefined) {
-    const win = jsdomInst.window;
-    Object.defineProperty(globalThis, "localStorage", {
-      get: () => win._localStorage,
-      set: (v: unknown) => { win._localStorage = v; },
-      configurable: true,
-      enumerable: false,
-    });
-    Object.defineProperty(globalThis, "sessionStorage", {
-      get: () => win._sessionStorage,
-      set: (v: unknown) => { win._sessionStorage = v; },
-      configurable: true,
-      enumerable: false,
-    });
+  // Node 26 ships a `localStorage` global that is non-functional in the test VM
+  // (it needs --localstorage-file), and vitest's populateGlobal() won't overwrite
+  // an already-present global, so jsdom's Storage never wins. When the current
+  // localStorage is missing or fails a round-trip, install a tiny in-memory
+  // Storage polyfill. Test-only and clearly a substitute, so it can't mask real
+  // browser Storage bugs; version-independent (no jsdom internals).
+  const storageBroken = (() => {
+    try {
+      if (typeof localStorage === "undefined" || localStorage === null) return true;
+      localStorage.setItem("__probe__", "1");
+      const ok = localStorage.getItem("__probe__") === "1";
+      localStorage.removeItem("__probe__");
+      return !ok;
+    } catch {
+      return true;
+    }
+  })();
+  if (storageBroken) {
+    const makeStorage = (): Storage => {
+      const store = new Map<string, string>();
+      return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, String(v)); },
+        removeItem: (k: string) => { store.delete(k); },
+        clear: () => { store.clear(); },
+        key: (i: number) => [...store.keys()][i] ?? null,
+        get length() { return store.size; },
+      } as Storage;
+    };
+    Object.defineProperty(globalThis, "localStorage", { value: makeStorage(), configurable: true });
+    Object.defineProperty(globalThis, "sessionStorage", { value: makeStorage(), configurable: true });
   }
 }
