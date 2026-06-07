@@ -1,7 +1,9 @@
+import { toast } from "sonner";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 
-/** Botón de opt-in de Web Push. En iPhone, si la app no está en modo standalone, explica
- *  el paso de "Agregar a pantalla de inicio" antes de poder activar. */
+/** Botón de opt-in de Web Push. Se monta con exactamente un token: personalToken en el
+ *  panel personal, adminToken en el admin. En iPhone, si la app no está en modo standalone,
+ *  explica el paso de "Agregar a pantalla de inicio" antes de poder activar. */
 export function PushOptIn({ personalToken, adminToken }: { personalToken?: string; adminToken?: string }) {
   const { supported, standalone, enabled, busy, enable, disable } = usePushSubscription({ personalToken, adminToken });
   if (!supported) return null;
@@ -21,6 +23,7 @@ export function PushOptIn({ personalToken, adminToken }: { personalToken?: strin
       await (enabled ? disable() : enable());
     } catch (err) {
       console.error("Error al cambiar la suscripción de avisos:", err);
+      toast.error("No se pudo cambiar la suscripción de avisos");
     }
   }
 
