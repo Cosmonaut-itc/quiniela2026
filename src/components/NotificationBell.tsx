@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { useNotificationToasts } from "@/lib/useNotificationToasts";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,11 @@ export function NotificationBell({
     const next = !open;
     setOpen(next);
     if (next && unread > 0) {
-      await markRead(kind === "me" ? { personalToken: token } : { adminToken: token });
+      try {
+        await markRead(kind === "me" ? { personalToken: token } : { adminToken: token });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudieron marcar como leídos");
+      }
     }
   }
 

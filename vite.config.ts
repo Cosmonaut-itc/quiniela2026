@@ -21,7 +21,7 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}", "convex/**/*.test.ts"],
     environmentOptions: {
       jsdom: {
-        // localStorage requiere un origen no opaco (jsdom default es about:blank).
+        // localStorage requires a non-opaque origin (jsdom defaults to about:blank).
         url: "http://localhost",
       },
     },

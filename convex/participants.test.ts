@@ -41,6 +41,13 @@ describe("joinQuiniela", () => {
     ).rejects.toThrow();
   });
 
+  it("rejects a whitespace-only name", async () => {
+    const { t, q } = await setup(4);
+    await expect(
+      t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "   " }),
+    ).rejects.toThrow();
+  });
+
   it("does not assign teams on join when assignMode is on_reveal", async () => {
     const t = convexTest(schema, import.meta.glob("./**/*.*s"));
     await t.mutation(internal.seed.seedFromSnapshot, {});

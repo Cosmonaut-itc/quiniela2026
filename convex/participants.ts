@@ -22,6 +22,7 @@ export const joinQuiniela = mutation({
     if (k >= qn.numParticipants) throw new Error("Ya no hay lugares disponibles");
 
     const name = args.name.trim().slice(0, 40);
+    if (!name) throw new Error("El nombre no puede estar vacío");
     const personalToken = newToken();
     const participantId = await ctx.db.insert("participants", {
       quinielaId: qn._id, name,

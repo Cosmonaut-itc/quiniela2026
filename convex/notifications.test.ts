@@ -37,7 +37,7 @@ const tokenOf = (t: T, quinielaId: string) =>
 describe("lectura y marcado de avisos", () => {
   it("listForParticipant devuelve items y unreadCount; markRead los marca", async () => {
     const { t, q, personalToken } = await quinielaWithPlayer();
-    // joinQuiniela aún no emite avisos (eso es Task 5); inserto uno directo para probar lectura.
+    // joinQuiniela ya emite teams_assigned (Layer 3); inserto uno adicional "test" para probar lectura.
     const me = await t.run((ctx) =>
       ctx.db.query("participants").withIndex("by_personalToken", (x) => x.eq("personalToken", personalToken)).first());
     await t.run((ctx) => ctx.db.insert("notifications", {
