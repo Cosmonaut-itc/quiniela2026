@@ -1,7 +1,18 @@
-import { useEffect, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { readStoredToken, persistToken } from "@/lib/storage";
+import { parsePersonalPanelPath } from "@/lib/personalLink";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 /**
  * Mobile-first page shell for the whole app: a centered ~28rem column on a
@@ -60,6 +71,25 @@ export function BottomNav({
   const storedMe = meToken ?? readStoredToken(id, "me");
   const storedJoin = joinToken ?? readStoredToken(id, "join");
 
+  // Recuperación de "Mi panel" cuando no hay token en este dispositivo (típico de
+  // la PWA en iOS: storage aislado de Safari y sin barra de direcciones). El
+  // inscrito pega su link personal y lo llevamos a su panel (que ya persiste el
+  // token al montar, así que las próximas veces el tab queda habilitado).
+  const navigate = useNavigate();
+  const [recoverOpen, setRecoverOpen] = useState(false);
+  const [linkInput, setLinkInput] = useState("");
+
+  function recoverPanel() {
+    const path = parsePersonalPanelPath(linkInput, id);
+    if (!path) {
+      toast.error("No reconocí el link. Pega tu link personal completo.");
+      return;
+    }
+    setRecoverOpen(false);
+    setLinkInput("");
+    navigate(path);
+  }
+
   const items: { key: NavKey; label: string; emoji: string; to: string | null }[] =
     [
       {
@@ -105,6 +135,14 @@ export function BottomNav({
                   <Link to={it.to} className="block">
                     {content}
                   </Link>
+                ) : it.key === "me" ? (
+                  <button
+                    type="button"
+                    onClick={() => setRecoverOpen(true)}
+                    className="block w-full"
+                  >
+                    {content}
+                  </button>
                 ) : (
                   <span className="block cursor-not-allowed opacity-60">
                     {content}
@@ -115,6 +153,50 @@ export function BottomNav({
           })}
         </div>
       </div>
+
+      <Dialog
+        open={recoverOpen}
+        onOpenChange={(o) => {
+          setRecoverOpen(o);
+          if (!o) setLinkInput("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ir a Mi panel</DialogTitle>
+            <DialogDescription>
+              Pega tu link personal (el que recibiste al inscribirte) para abrir
+              tu panel en esta app.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              recoverPanel();
+            }}
+          >
+            <Input
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              placeholder="https://…/q/…/me/…"
+              inputMode="url"
+              autoFocus
+            />
+            <Button
+              type="submit"
+              size="lg"
+              className="h-11 rounded-xl font-bold"
+              disabled={!linkInput.trim()}
+            >
+              Abrir mi panel
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              ¿No lo tienes? Pídeselo al organizador.
+            </p>
+          </form>
+        </DialogContent>
+      </Dialog>
     </nav>
   );
 }
