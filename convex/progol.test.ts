@@ -53,3 +53,24 @@ describe("progol.predict", () => {
     await expect(t.mutation(api.progol.predict, { personalToken, matchId: blankId, pick: "home" })).rejects.toThrow();
   });
 });
+
+describe("progol.getGeneral", () => {
+  it("ordena el leaderboard por aciertos", async () => {
+    const { t, q } = await seededProgol();
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const b = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Beto" });
+    const matchId = await futureGroupMatch(t);
+    await t.mutation(api.progol.predict, { personalToken: a.personalToken, matchId, pick: "home" });
+    await t.mutation(api.progol.predict, { personalToken: b.personalToken, matchId, pick: "away" });
+    await t.run((ctx) => ctx.db.patch(matchId, { status: "finished", homeScore: 2, awayScore: 0 }));
+    const g = await t.query(api.progol.getGeneral, { joinToken: q.joinToken });
+    expect(g.mode).toBe("progol");
+    expect(g.decidedMatches).toBe(1);
+    const ana = g.leaderboard.find((r) => r.name === "Ana")!;
+    const beto = g.leaderboard.find((r) => r.name === "Beto")!;
+    expect(ana.points).toBe(1);
+    expect(beto.points).toBe(0);
+    expect(ana.rank).toBe(1);
+    expect(beto.rank).toBe(2);
+  });
+});

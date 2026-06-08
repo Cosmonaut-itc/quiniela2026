@@ -40,3 +40,44 @@ export const predict = mutation({
     return { ok: true as const };
   },
 });
+
+export const getGeneral = query({
+  args: { joinToken: v.string() },
+  handler: async (ctx, args): Promise<ProgolGeneralData> => {
+    const qn = await ctx.db.query("quinielas")
+      .withIndex("by_joinToken", (q) => q.eq("joinToken", args.joinToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const { effRows } = await resolveQuiniela(ctx, qn._id);
+    const finalDone = effRows.some((mt) => mt.stage === "final" && mt.status === "finished");
+    const participants = await ctx.db.query("participants")
+      .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+    const picks = await ctx.db.query("predictions")
+      .withIndex("by_quiniela_participant", (q) => q.eq("quinielaId", qn._id)).collect();
+    const results = new Map<string, Pick>();
+    for (const mt of effRows) { const r = matchResult(mt); if (r) results.set(mt._id, r); }
+    const rows = leaderboard(
+      participants.map((p) => ({ id: p._id as string })),
+      picks.map((pk) => ({ participantId: pk.participantId as string, matchId: pk.matchId as string, pick: pk.pick as Pick })),
+      results,
+    );
+    const pById = new Map(participants.map((p) => [p._id as string, p]));
+    const board = await Promise.all(rows.map(async (r) => {
+      const p = pById.get(r.participantId)!;
+      return {
+        participantId: r.participantId, name: p.name, photoUrl: await photoUrl(ctx, p.photoId),
+        points: r.points, correct: r.correct, played: r.played, rank: r.rank,
+      };
+    }));
+    const paidCount = participants.filter((p) => p.paid === true).length;
+    const status = (finalDone ? "finished" : qn.status) as "open" | "locked" | "finished";
+    const winnerParticipantIds = finalDone ? board.filter((b) => b.rank === 1).map((b) => b.participantId) : [];
+    return {
+      mode: "progol",
+      quiniela: {
+        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prize: prizeView(qn, paidCount),
+        status, filledCount: participants.length, notes: qn.notes ?? null,
+      },
+      leaderboard: board, decidedMatches: results.size, winnerParticipantIds,
+    };
+  },
+});
