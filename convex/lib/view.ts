@@ -1,6 +1,6 @@
 // convex/lib/view.ts
 import type { Id } from "../_generated/dataModel";
-import type { TeamLite, PrizeMode, PrizeView } from "../types";
+import type { TeamLite, PrizeMode, PrizeView, PlayerTeam } from "../types";
 
 export function teamLite(
   t: { code: string; name: string; flag: string; group: string } | null | undefined,
@@ -28,4 +28,14 @@ export function prizeView(
     return { mode: "per_person", text: "", entryFee, pool: entryFee * contributors, contributors };
   }
   return { mode: "fixed", text: qn.prizeText, entryFee: null, pool: null, contributors };
+}
+
+/** Orden estable de los equipos de un jugador: vivos primero, luego grupo y nombre. */
+export function sortPlayerTeams(teams: PlayerTeam[]): PlayerTeam[] {
+  return [...teams].sort(
+    (a, b) =>
+      (b.alive ? 1 : 0) - (a.alive ? 1 : 0) ||
+      a.team.group.localeCompare(b.team.group) ||
+      a.team.name.localeCompare(b.team.name),
+  );
 }

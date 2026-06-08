@@ -71,6 +71,7 @@ export type AdminData = {
 };
 
 export type TeamLite = { code: string; name: string; flag: string; group: string };
+export type PlayerTeam = { team: TeamLite; alive: boolean };
 
 export type NotificationItem = {
   id: string; type: string; title: string; body: string; createdAt: number; read: boolean;

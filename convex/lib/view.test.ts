@@ -1,6 +1,6 @@
 // convex/lib/view.test.ts
 import { describe, it, expect } from "vitest";
-import { prizeModeOf, prizeView } from "./view";
+import { prizeModeOf, prizeView, sortPlayerTeams } from "./view";
 
 describe("prizeModeOf", () => {
   it("treats a missing mode as fixed (legacy)", () => {
@@ -29,5 +29,33 @@ describe("prizeView", () => {
   it("per_person with zero contributors yields a zero pool", () => {
     const p = prizeView({ prizeText: "", prizeMode: "per_person", entryFee: 200 }, 0);
     expect(p.pool).toBe(0);
+  });
+});
+
+describe("sortPlayerTeams", () => {
+  const t = (name: string, group: string, alive: boolean) => ({
+    team: { code: name.slice(0, 3).toUpperCase(), name, flag: "🏴", group },
+    alive,
+  });
+
+  it("pone los equipos vivos antes que los eliminados", () => {
+    const out = sortPlayerTeams([t("Brasil", "C", false), t("Argentina", "A", true)]);
+    expect(out.map((x) => x.team.name)).toEqual(["Argentina", "Brasil"]);
+  });
+
+  it("entre vivos, ordena por grupo y luego por nombre", () => {
+    const out = sortPlayerTeams([
+      t("México", "A", true),
+      t("Japón", "B", true),
+      t("Canadá", "A", true),
+    ]);
+    expect(out.map((x) => x.team.name)).toEqual(["Canadá", "México", "Japón"]);
+  });
+
+  it("no muta el arreglo original", () => {
+    const input = [t("Brasil", "C", false), t("Argentina", "A", true)];
+    const copy = [...input];
+    sortPlayerTeams(input);
+    expect(input).toEqual(copy);
   });
 });
