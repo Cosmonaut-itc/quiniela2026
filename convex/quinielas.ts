@@ -217,6 +217,8 @@ export const getAdmin = query({
     };
     const sorted = [...matches].sort((a, b) => a.kickoffAt - b.kickoffAt);
     const paidCount = participants.filter((p) => p.paid === true).length;
+    const efectivoCount = participants.filter((p) => p.paymentMethod === "efectivo").length;
+    const transferenciaCount = participants.filter((p) => p.paymentMethod === "transferencia").length;
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId),
@@ -225,11 +227,13 @@ export const getAdmin = query({
         status: (championParticipantId ? "finished" : qn.status) as "open" | "locked" | "finished",
         joinToken: qn.joinToken, assignMode: modeOf(qn),
         notes: qn.notes ?? null,
+        methodCounts: { efectivo: efectivoCount, transferencia: transferenciaCount },
       },
       participants: participants.map((p) => ({
         id: p._id as string, name: p.name, personalToken: p.personalToken,
         teamCount: ownerships.filter((o) => o.participantId === p._id).length,
         paid: p.paid === true,
+        paymentMethod: p.paymentMethod ?? null,
       })),
       matches: sorted.map((mt) => {
         const e = effById.get(mt._id as string)!;

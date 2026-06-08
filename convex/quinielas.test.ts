@@ -186,6 +186,26 @@ describe("getAdmin", () => {
     expect(admin.participants[0].id).toBeDefined();
     expect(admin.participants[0].paid).toBe(false);
   });
+
+  it("expone el método de pago por participante y el desglose por método", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Rifa", prizeText: "", numParticipants: 20, prizeMode: "per_person", entryFee: 200,
+    });
+    for (const name of ["Ana", "Beto"]) {
+      await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name });
+    }
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: ps[0]._id, method: "efectivo" });
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: ps[1]._id, method: "transferencia" });
+    const admin = await t.query(api.quinielas.getAdmin, { adminToken: q.adminToken });
+    const byName = Object.fromEntries(admin.participants.map((p) => [p.name, p]));
+    expect(byName["Ana"].paymentMethod).toBe("efectivo");
+    expect(byName["Beto"].paymentMethod).toBe("transferencia");
+    expect(admin.quiniela.methodCounts).toEqual({ efectivo: 1, transferencia: 1 });
+    expect(admin.quiniela.prize.contributors).toBe(2); // ambos cuentan al bote
+  });
 });
 
 describe("getOverview prize", () => {

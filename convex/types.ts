@@ -59,8 +59,10 @@ export type MundialData = {
 export type AdminData = {
   quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
-              joinToken: string; assignMode: AssignMode; notes: string | null };
-  participants: { id: string; name: string; personalToken: string; teamCount: number; paid: boolean }[];
+              joinToken: string; assignMode: AssignMode; notes: string | null;
+              methodCounts: { efectivo: number; transferencia: number } };
+  participants: { id: string; name: string; personalToken: string; teamCount: number; paid: boolean;
+                  paymentMethod: "efectivo" | "transferencia" | null }[];
   matches: { externalId: string; stage: string; label: string;
              homeTeam: TeamLite | null; awayTeam: TeamLite | null;
              homeExternalId: string | null; awayExternalId: string | null;
