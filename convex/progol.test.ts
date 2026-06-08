@@ -105,3 +105,21 @@ describe("progol.getPersonal / getCard", () => {
     expect(mine.pick).toBe("draw");
   });
 });
+
+describe("progol.getAdmin / closeRegistration", () => {
+  it("lista participantes con puntos y expone los 104 partidos", async () => {
+    const { t, q } = await seededProgol();
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const admin = await t.query(api.progol.getAdmin, { adminToken: q.adminToken });
+    expect(admin.participants).toHaveLength(1);
+    expect(admin.participants[0].points).toBe(0);
+    expect(admin.matches.length).toBe(104);
+    expect(admin.quiniela.joinToken).toBe(q.joinToken);
+  });
+  it("closeRegistration cierra la inscripción", async () => {
+    const { t, q } = await seededProgol();
+    await t.mutation(api.progol.closeRegistration, { adminToken: q.adminToken });
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.status).toBe("locked");
+  });
+});

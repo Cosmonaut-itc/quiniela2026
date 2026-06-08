@@ -157,3 +157,70 @@ export const getCard = query({
     return buildCard(ctx, qn, who);
   },
 });
+
+export const getAdmin = query({
+  args: { adminToken: v.string() },
+  handler: async (ctx, args): Promise<ProgolAdminData> => {
+    const qn = await ctx.db.query("quinielas")
+      .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const { teamById, effById, effRows, overriddenMatchIds, matches } = await resolveQuiniela(ctx, qn._id);
+    const participants = await ctx.db.query("participants")
+      .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+    const picks = await ctx.db.query("predictions")
+      .withIndex("by_quiniela_participant", (q) => q.eq("quinielaId", qn._id)).collect();
+    const results = new Map<string, Pick>();
+    for (const mt of effRows) { const r = matchResult(mt); if (r) results.set(mt._id, r); }
+    const rows = leaderboard(
+      participants.map((p) => ({ id: p._id as string })),
+      picks.map((pk) => ({ participantId: pk.participantId as string, matchId: pk.matchId as string, pick: pk.pick as Pick })),
+      results,
+    );
+    const rowById = new Map(rows.map((r) => [r.participantId, r]));
+    const paidCount = participants.filter((p) => p.paid === true).length;
+    const efectivoCount = participants.filter((p) => p.paymentMethod === "efectivo").length;
+    const transferenciaCount = participants.filter((p) => p.paymentMethod === "transferencia").length;
+    const finalDone = effRows.some((mt) => mt.stage === "final" && mt.status === "finished");
+    const sorted = [...matches].sort((a, b) => a.kickoffAt - b.kickoffAt);
+    return {
+      quiniela: {
+        name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prize: prizeView(qn, paidCount),
+        status: (finalDone ? "finished" : qn.status) as "open" | "locked" | "finished",
+        joinToken: qn.joinToken, notes: qn.notes ?? null, filledCount: participants.length,
+        methodCounts: { efectivo: efectivoCount, transferencia: transferenciaCount },
+      },
+      participants: participants.map((p) => {
+        const r = rowById.get(p._id as string)!;
+        return {
+          id: p._id as string, name: p.name, personalToken: p.personalToken,
+          points: r.points, played: r.played, paid: p.paid === true, paymentMethod: p.paymentMethod ?? null,
+        };
+      }),
+      matches: sorted.map((mt) => {
+        const e = effById.get(mt._id as string)!;
+        const winner = e.winnerTeamId ? teamById.get(e.winnerTeamId as Id<"teams">) : null;
+        return {
+          externalId: mt.externalId, stage: mt.stage, label: STAGE_LABEL[mt.stage] ?? mt.stage,
+          homeTeam: mt.homeTeamId ? teamLite(teamById.get(mt.homeTeamId)) : null,
+          awayTeam: mt.awayTeamId ? teamLite(teamById.get(mt.awayTeamId)) : null,
+          homeExternalId: mt.homeTeamId ? teamById.get(mt.homeTeamId)?.externalId ?? null : null,
+          awayExternalId: mt.awayTeamId ? teamById.get(mt.awayTeamId)?.externalId ?? null : null,
+          homeScore: e.homeScore, awayScore: e.awayScore, status: e.status,
+          winnerExternalId: winner?.externalId ?? null, manualOverride: overriddenMatchIds.has(mt._id as string),
+        };
+      }),
+    };
+  },
+});
+
+export const closeRegistration = mutation({
+  args: { adminToken: v.string() },
+  handler: async (ctx, args) => {
+    const qn = await ctx.db.query("quinielas")
+      .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    if (gameModeOf(qn) !== "progol") throw new Error("Solo aplica a quinielas de pronósticos");
+    if (qn.status === "open") await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });
+    return { ok: true as const };
+  },
+});
