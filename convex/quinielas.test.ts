@@ -278,6 +278,36 @@ describe("getOverview prize", () => {
   });
 });
 
+describe("createQuiniela progol", () => {
+  it("crea una quiniela progol sin reparto ni tope", async () => {
+    const t = await seeded();
+    const res = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Pronos", prizeText: "$5,000", numParticipants: 10, gameMode: "progol",
+    });
+    const qn = await t.run((ctx) => ctx.db.get(res.quinielaId));
+    expect(qn!.gameMode).toBe("progol");
+    expect(qn!.numParticipants).toBe(0);     // centinela de "sin límite"
+    expect(qn!.slotSizes).toEqual([]);
+  });
+  it("default a clasica cuando no se pasa gameMode", async () => {
+    const t = await seeded();
+    const res = await t.mutation(api.quinielas.createQuiniela, { name: "C", prizeText: "$1", numParticipants: 6 });
+    const qn = await t.run((ctx) => ctx.db.get(res.quinielaId));
+    expect(qn!.gameMode).toBe("clasica");
+    expect(qn!.slotSizes.reduce((a: number, b: number) => a + b, 0)).toBe(48);
+  });
+});
+
+describe("getMode", () => {
+  it("devuelve el modo de la quiniela", async () => {
+    const t = await seeded();
+    const c = await t.mutation(api.quinielas.createQuiniela, { name: "C", prizeText: "$1", numParticipants: 4 });
+    const p = await t.mutation(api.quinielas.createQuiniela, { name: "P", prizeText: "$1", numParticipants: 4, gameMode: "progol" });
+    expect((await t.query(api.quinielas.getMode, { id: c.quinielaId })).gameMode).toBe("clasica");
+    expect((await t.query(api.quinielas.getMode, { id: p.quinielaId })).gameMode).toBe("progol");
+  });
+});
+
 describe("notes", () => {
   it("stores trimmed notes on create and omits empty notes", async () => {
     const t = await seeded();

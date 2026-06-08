@@ -4,9 +4,9 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
-import { teamLite, photoUrl, prizeView, sortPlayerTeams } from "./lib/view";
+import { teamLite, photoUrl, prizeView, sortPlayerTeams, gameModeOf } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
-import type { OverviewData, PlayerStatus, AdminData, AssignMode } from "./types";
+import type { OverviewData, PlayerStatus, AdminData, AssignMode, GameMode } from "./types";
 import { insertNotification } from "./notifications";
 import { quinielaClosedNotice, teamsAssignedNotice } from "./lib/notify";
 
@@ -68,10 +68,13 @@ export const createQuiniela = mutation({
     prizeMode: v.optional(v.string()),  // "fixed" | "per_person"
     entryFee: v.optional(v.number()),   // requerido en per_person
     notes: v.optional(v.string()),
+    gameMode: v.optional(v.string()),   // "clasica" | "progol"
   },
   handler: async (ctx, args) => {
-    const n = Math.max(1, Math.min(48, Math.floor(args.numParticipants)));
-    const slotSizes = shuffleInPlace(computeSlotSizes(n, 48), Math.random);
+    const isProgol = args.gameMode === "progol";
+    // progol: sin tope (centinela 0) ni reparto de equipos (slotSizes vacío).
+    const n = isProgol ? 0 : Math.max(1, Math.min(48, Math.floor(args.numParticipants)));
+    const slotSizes = isProgol ? [] : shuffleInPlace(computeSlotSizes(n, 48), Math.random);
     const adminToken = newToken();
     const joinToken = newToken();
     const perPerson = args.prizeMode === "per_person";
@@ -88,6 +91,7 @@ export const createQuiniela = mutation({
       joinToken,
       status: "open",
       assignMode: args.assignMode === "on_reveal" ? "on_reveal" : "on_join",
+      gameMode: isProgol ? "progol" : "clasica",
       photoId: args.photoId,
       notes: notes || undefined,
       createdAt: Date.now(),
@@ -256,5 +260,14 @@ export const getAdmin = query({
         };
       }),
     };
+  },
+});
+
+export const getMode = query({
+  args: { id: v.id("quinielas") },
+  handler: async (ctx, args): Promise<{ gameMode: GameMode }> => {
+    const qn = await ctx.db.get(args.id);
+    if (!qn) throw new Error("Quiniela no encontrada");
+    return { gameMode: gameModeOf(qn) };
   },
 });
