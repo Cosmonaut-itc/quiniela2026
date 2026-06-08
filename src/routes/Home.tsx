@@ -26,6 +26,7 @@ export default function Home() {
   );
   const [prizeMode, setPrizeMode] = useState<"fixed" | "per_person">("fixed");
   const [fee, setFee] = useState(200);
+  const [gameMode, setGameMode] = useState<"clasica" | "progol">("clasica");
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -42,6 +43,7 @@ export default function Home() {
         prizeMode,
         entryFee: prizeMode === "per_person" ? fee : undefined,
         notes,
+        gameMode,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
     } finally {
@@ -83,6 +85,37 @@ export default function Home() {
             void submit();
           }}
         >
+          <div className="flex flex-col gap-2">
+            <Label>Modo de juego</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { v: "clasica", title: "Clásica", sub: "Se reparten los 48 equipos; gana el dueño del campeón." },
+                  { v: "progol", title: "Progol 🎯", sub: "Cada quien pronostica 1/X/2 por partido; gana quien más acierte." },
+                ] as const
+              ).map((o) => {
+                const active = gameMode === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setGameMode(o.v)}
+                    aria-pressed={active}
+                    className={
+                      "rounded-2xl border px-3 py-2.5 text-left transition-colors " +
+                      (active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-card text-muted-foreground hover:border-foreground/30")
+                    }
+                  >
+                    <div className="text-sm font-bold text-foreground">{o.title}</div>
+                    <div className="mt-0.5 text-[0.7rem] leading-snug">{o.sub}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Nombre de la quiniela</Label>
             <Input
@@ -165,6 +198,7 @@ export default function Home() {
             )}
           </div>
 
+          {gameMode === "clasica" && (<>
           <div className="flex flex-col gap-2">
             <Label htmlFor="n">
               {prizeMode === "per_person"
@@ -236,6 +270,7 @@ export default function Home() {
               })}
             </div>
           </div>
+          </>)}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="notes">Notas (opcional)</Label>
