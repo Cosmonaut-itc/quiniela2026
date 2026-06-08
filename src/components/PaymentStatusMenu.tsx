@@ -2,26 +2,16 @@ import { CheckIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
+  paymentTriggerLabel,
+  type PaymentMethod,
+  type PaymentSelection,
+} from "@/lib/payment";
+import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-
-export type PaymentMethod = "efectivo" | "transferencia";
-export type PaymentSelection = "pending" | PaymentMethod;
-
-const METHOD_LABEL: Record<PaymentMethod, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
-};
-
-/** Etiqueta del botón según el estado de pago. Pura (fácil de testear). */
-export function paymentTriggerLabel(paid: boolean, method: PaymentMethod | null): string {
-  if (!paid) return "Pendiente";
-  if (method) return `✓ ${METHOD_LABEL[method]}`;
-  return "✓ Pagó"; // legacy: pagó sin método registrado
-}
 
 const ITEMS: { value: PaymentSelection; label: string }[] = [
   { value: "pending", label: "Pendiente" },

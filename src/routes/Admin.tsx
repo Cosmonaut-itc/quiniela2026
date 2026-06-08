@@ -8,6 +8,7 @@ import { Shell } from "@/components/Shell";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PushOptIn } from "@/components/PushOptIn";
 import { SectionHeading } from "@/components/bits";
+import { PaymentStatusMenu } from "@/components/PaymentStatusMenu";
 import { formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ export default function Admin() {
   const data = useQuery(api.quinielas.getAdmin, { adminToken: token! });
   const close = useMutation(api.quinielas.closeAndRedistribute);
   const saveNotes = useMutation(api.quinielas.updateNotes);
-  const setPaid = useMutation(api.participants.setParticipantPaid);
+  const setPayment = useMutation(api.participants.setParticipantPayment);
   const setResult = useMutation(api.matches.setMatchResultManual);
   const clearOverride = useMutation(api.matches.clearMatchOverride);
 
@@ -47,7 +48,7 @@ export default function Admin() {
   // `null` significa "sin editar": el editor refleja las notas del servidor.
   const [notesEdit, setNotesEdit] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
-  const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
+  const [savingPaymentId, setSavingPaymentId] = useState<string | null>(null);
 
   if (data === undefined) return <LoadingState />;
 
@@ -60,7 +61,11 @@ export default function Admin() {
   const perPerson = quiniela.prize.mode === "per_person";
   const paidCount = quiniela.prize.contributors;
   const pendingCount = quiniela.filledCount - paidCount;
-  const pendingPesos = pendingCount * (quiniela.prize.entryFee ?? 0);
+  const entryFee = quiniela.prize.entryFee ?? 0;
+  const pendingPesos = pendingCount * entryFee;
+  const efectivoPesos = quiniela.methodCounts.efectivo * entryFee;
+  const transferenciaPesos = quiniela.methodCounts.transferencia * entryFee;
+  const sinClasificar = paidCount - quiniela.methodCounts.efectivo - quiniela.methodCounts.transferencia;
 
   const statusLabel =
     quiniela.status === "open"
@@ -104,14 +109,21 @@ export default function Admin() {
     }
   }
 
-  async function onTogglePaid(participantId: string, paid: boolean) {
-    setTogglingPaidId(participantId);
+  async function onSelectPayment(
+    participantId: string,
+    method: "pending" | "efectivo" | "transferencia",
+  ) {
+    setSavingPaymentId(participantId);
     try {
-      await setPaid({ adminToken: token!, participantId: participantId as Id<"participants">, paid });
+      await setPayment({
+        adminToken: token!,
+        participantId: participantId as Id<"participants">,
+        method,
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo actualizar el pago");
     } finally {
-      setTogglingPaidId(null);
+      setSavingPaymentId(null);
     }
   }
 
@@ -286,6 +298,12 @@ export default function Admin() {
             {paidCount}/{quiniela.filledCount} pagados
             {pendingCount > 0 && ` · ${formatMXN(pendingPesos)} pendientes`}
           </div>
+          {paidCount > 0 && (
+            <div className="mt-0.5 text-[0.7rem] text-muted-foreground">
+              Efectivo: {formatMXN(efectivoPesos)} · Transferencia: {formatMXN(transferenciaPesos)}
+              {sinClasificar > 0 && ` · Sin clasificar: ${formatMXN(sinClasificar * entryFee)}`}
+            </div>
+          )}
         </div>
       )}
       <div className="space-y-2.5">
@@ -308,20 +326,12 @@ export default function Admin() {
                 </div>
               </div>
               {perPerson && (
-                <button
-                  type="button"
-                  onClick={() => void onTogglePaid(p.id, !p.paid)}
-                  disabled={togglingPaidId === p.id}
-                  aria-pressed={p.paid}
-                  className={
-                    "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50 " +
-                    (p.paid
-                      ? "bg-alive/15 text-alive"
-                      : "bg-muted/60 text-muted-foreground hover:text-foreground")
-                  }
-                >
-                  {p.paid ? "✓ Pagó" : "Pendiente"}
-                </button>
+                <PaymentStatusMenu
+                  paid={p.paid}
+                  method={p.paymentMethod}
+                  disabled={savingPaymentId === p.id}
+                  onSelect={(method) => void onSelectPayment(p.id, method)}
+                />
               )}
               <Button
                 size="sm"
