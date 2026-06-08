@@ -65,6 +65,14 @@ export type MundialData = {
                         winnerTeamId: string | null; status: string }[] }[];
 };
 
+export type AdminMatchView = {
+  externalId: string; stage: string; label: string;
+  homeTeam: TeamLite | null; awayTeam: TeamLite | null;
+  homeExternalId: string | null; awayExternalId: string | null;
+  homeScore: number | null; awayScore: number | null;
+  status: string; winnerExternalId: string | null; manualOverride: boolean;
+};
+
 export type AdminData = {
   quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
               numParticipants: number; filledCount: number; status: "open" | "locked" | "finished";
@@ -72,15 +80,54 @@ export type AdminData = {
               methodCounts: { efectivo: number; transferencia: number } };
   participants: { id: string; name: string; personalToken: string; teamCount: number; paid: boolean;
                   paymentMethod: "efectivo" | "transferencia" | null }[];
-  matches: { externalId: string; stage: string; label: string;
-             homeTeam: TeamLite | null; awayTeam: TeamLite | null;
-             homeExternalId: string | null; awayExternalId: string | null;
-             homeScore: number | null; awayScore: number | null;
-             status: string; winnerExternalId: string | null; manualOverride: boolean }[];
+  matches: AdminMatchView[];
 };
 
 export type TeamLite = { code: string; name: string; flag: string; group: string };
 export type PlayerTeam = { team: TeamLite; alive: boolean };
+
+export type ProgolLeaderRow = {
+  participantId: string; name: string; photoUrl: string | null;
+  points: number; correct: number; played: number; rank: number;
+};
+
+export type ProgolGeneralData = {
+  mode: "progol";
+  quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
+              status: "open" | "locked" | "finished"; filledCount: number; notes: string | null };
+  leaderboard: ProgolLeaderRow[];
+  decidedMatches: number;
+  winnerParticipantIds: string[];
+};
+
+export type ProgolMatchView = {
+  matchId: string; stage: string; label: string;
+  home: TeamLite | null; away: TeamLite | null; kickoffAt: number;
+  state: "pending" | "predictable" | "locked" | "finished";
+  pick: Pick | null;       // pick del DUEÑO de la tarjeta (mío en getPersonal, suyo en getCard)
+  result: Pick | null;     // si finished
+  correct: boolean | null; // si finished y había pick
+  homeScore: number | null; awayScore: number | null;
+};
+
+export type ProgolCardData = {
+  mode: "progol";
+  quinielaId: string; quinielaName: string; joinToken: string; prize: PrizeView;
+  status: "open" | "locked" | "finished";
+  who: { participantId: string; name: string; photoUrl: string | null;
+         points: number; rank: number; correct: number; played: number };
+  stages: { stage: string; label: string; matches: ProgolMatchView[] }[];
+};
+
+export type ProgolAdminData = {
+  quiniela: { name: string; photoUrl: string | null; prize: PrizeView;
+              status: "open" | "locked" | "finished"; joinToken: string; notes: string | null;
+              filledCount: number; methodCounts: { efectivo: number; transferencia: number } };
+  participants: { id: string; name: string; personalToken: string;
+                  points: number; played: number; paid: boolean;
+                  paymentMethod: "efectivo" | "transferencia" | null }[];
+  matches: AdminMatchView[];
+};
 
 export type NotificationItem = {
   id: string; type: string; title: string; body: string; createdAt: number; read: boolean;
