@@ -11,10 +11,10 @@ import { SectionHeading } from "@/components/bits";
 import { PaymentStatusMenu } from "@/components/PaymentStatusMenu";
 import { formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CopyIcon, CheckIcon, LinkIcon } from "lucide-react";
+import { CopyIcon, LinkIcon } from "lucide-react";
+import { MatchScoreEditor } from "@/components/MatchScoreEditor";
 
 function LoadingState() {
   return (
@@ -39,10 +39,6 @@ export default function Admin() {
   const setResult = useMutation(api.matches.setMatchResultManual);
   const clearOverride = useMutation(api.matches.clearMatchOverride);
 
-  const [scores, setScores] = useState<Record<string, { h?: string; a?: string }>>(
-    {},
-  );
-  const [winners, setWinners] = useState<Record<string, "home" | "draw" | "away">>({});
   const [closing, setClosing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   // `null` significa "sin editar": el editor refleja las notas del servidor.
@@ -127,41 +123,12 @@ export default function Admin() {
     }
   }
 
-  type AdminMatch = (typeof data.matches)[number];
-
-  // En eliminatoria el empate necesita un ganador explícito (penales/prórroga);
-  // preselecciona con el ganador efectivo que ya trae la quiniela.
-  function selectedWinner(m: AdminMatch): "home" | "draw" | "away" {
-    return (
-      winners[m.externalId] ??
-      (m.winnerExternalId && m.winnerExternalId === m.homeExternalId
-        ? "home"
-        : m.winnerExternalId && m.winnerExternalId === m.awayExternalId
-          ? "away"
-          : "draw")
-    );
-  }
-
-  async function saveScore(m: AdminMatch) {
-    const s = scores[m.externalId] ?? {};
-    const homeScore = Number(s.h ?? m.homeScore ?? 0);
-    const awayScore = Number(s.a ?? m.awayScore ?? 0);
-    let winnerExternalId: string | null | undefined = undefined;
-    if (m.stage !== "group") {
-      const sel = selectedWinner(m);
-      winnerExternalId =
-        sel === "home" ? m.homeExternalId : sel === "away" ? m.awayExternalId : null;
-    }
-    setSavingId(m.externalId);
+  async function onSaveScore(
+    externalId: string, homeScore: number, awayScore: number, winnerExternalId: string | null | undefined,
+  ) {
+    setSavingId(externalId);
     try {
-      await setResult({
-        adminToken: token!,
-        matchExternalId: m.externalId,
-        homeScore,
-        awayScore,
-        finished: true,
-        winnerExternalId,
-      });
+      await setResult({ adminToken: token!, matchExternalId: externalId, homeScore, awayScore, finished: true, winnerExternalId });
       toast.success("Marcador actualizado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
@@ -170,17 +137,10 @@ export default function Admin() {
     }
   }
 
-  async function revertScore(externalId: string) {
+  async function onRevertScore(externalId: string) {
     setSavingId(externalId);
     try {
       await clearOverride({ adminToken: token!, matchExternalId: externalId });
-      // Suelta la selección local de ganador para que un guardado posterior no
-      // reaplique el ganador viejo (el partido volvió al automático).
-      setWinners((prev) => {
-        const next = { ...prev };
-        delete next[externalId];
-        return next;
-      });
       toast.success("Volvió al resultado automático");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo revertir");
@@ -188,8 +148,6 @@ export default function Admin() {
       setSavingId(null);
     }
   }
-
-  const playableMatches = data.matches.filter((m) => m.homeTeam && m.awayTeam);
 
   return (
     <Shell>
@@ -352,135 +310,12 @@ export default function Admin() {
       </div>
 
       {/* Fix scores */}
-      <SectionHeading>Corregir marcador</SectionHeading>
-      {playableMatches.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border px-4 py-3 text-center text-xs text-muted-foreground">
-          No hay partidos con equipos definidos todavía.
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {playableMatches.map((m) => {
-            const s = scores[m.externalId] ?? {};
-            const saving = savingId === m.externalId;
-            return (
-              <div
-                key={m.externalId}
-                className="rounded-2xl border border-border bg-card px-3.5 py-3"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
-                    {m.label}
-                  </span>
-                  {m.manualOverride && (
-                    <span className="flex items-center gap-2">
-                      <span className="text-[0.65rem] font-semibold text-gold">
-                        editado a mano
-                      </span>
-                      <button
-                        type="button"
-                        disabled={savingId === m.externalId}
-                        onClick={() => void revertScore(m.externalId)}
-                        className="text-[0.65rem] font-semibold text-muted-foreground underline-offset-2 hover:text-gold hover:underline disabled:opacity-50"
-                      >
-                        ↺ volver al automático
-                      </button>
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="text-lg leading-none">
-                      {m.homeTeam!.flag}
-                    </span>
-                    <span className="truncate text-sm font-medium">
-                      {m.homeTeam!.code}
-                    </span>
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
-                    aria-label={`Goles ${m.homeTeam!.code}`}
-                    className="h-9 w-12 shrink-0 text-center"
-                    value={s.h ?? (m.homeScore ?? "")}
-                    onChange={(e) =>
-                      setScores((prev) => ({
-                        ...prev,
-                        [m.externalId]: { ...prev[m.externalId], h: e.target.value },
-                      }))
-                    }
-                  />
-                  <span className="text-muted-foreground">–</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
-                    aria-label={`Goles ${m.awayTeam!.code}`}
-                    className="h-9 w-12 shrink-0 text-center"
-                    value={s.a ?? (m.awayScore ?? "")}
-                    onChange={(e) =>
-                      setScores((prev) => ({
-                        ...prev,
-                        [m.externalId]: { ...prev[m.externalId], a: e.target.value },
-                      }))
-                    }
-                  />
-                  <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right">
-                    <span className="truncate text-sm font-medium">
-                      {m.awayTeam!.code}
-                    </span>
-                    <span className="text-lg leading-none">
-                      {m.awayTeam!.flag}
-                    </span>
-                  </span>
-                  <Button
-                    size="icon"
-                    className="size-9 shrink-0 rounded-lg"
-                    disabled={saving}
-                    aria-label="Guardar marcador"
-                    onClick={() => void saveScore(m)}
-                  >
-                    {saving ? (
-                      <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <CheckIcon />
-                    )}
-                  </Button>
-                </div>
-                {m.stage !== "group" && (
-                  <div className="mt-2.5 flex items-center gap-1.5">
-                    <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
-                      Ganador
-                    </span>
-                    {(
-                      [
-                        ["home", m.homeTeam!.code],
-                        ["draw", "Empate"],
-                        ["away", m.awayTeam!.code],
-                      ] as const
-                    ).map(([key, lbl]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setWinners((p) => ({ ...p, [m.externalId]: key }))}
-                        className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${
-                          selectedWinner(m) === key
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted/60 text-muted-foreground"
-                        }`}
-                        aria-pressed={selectedWinner(m) === key}
-                        aria-label={`Ganador ${lbl}`}
-                      >
-                        {lbl}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <MatchScoreEditor
+        matches={data.matches}
+        savingId={savingId}
+        onSave={(id, h, a, w) => void onSaveScore(id, h, a, w)}
+        onRevert={(id) => void onRevertScore(id)}
+      />
     </Shell>
   );
 }
