@@ -69,6 +69,28 @@ export const setParticipantPaid = mutation({
   },
 });
 
+export const setParticipantPayment = mutation({
+  args: {
+    adminToken: v.string(),
+    participantId: v.id("participants"),
+    method: v.union(v.literal("pending"), v.literal("efectivo"), v.literal("transferencia")),
+  },
+  handler: async (ctx, args) => {
+    const p = await ctx.db.get(args.participantId);
+    if (!p) throw new Error("Participante no encontrado");
+    const qn = await ctx.db.get(p.quinielaId);
+    if (!qn || qn.adminToken !== args.adminToken) throw new Error("No autorizado");
+    // `paid` sigue siendo la fuente de verdad del bote. Invariante: si hay método,
+    // paid=true. Al volver a "pending" se borran ambos (convención `|| undefined`).
+    if (args.method === "pending") {
+      await ctx.db.patch(args.participantId, { paid: undefined, paymentMethod: undefined });
+    } else {
+      await ctx.db.patch(args.participantId, { paid: true, paymentMethod: args.method });
+    }
+    return { ok: true as const };
+  },
+});
+
 export const updateParticipantPhoto = mutation({
   args: { personalToken: v.string(), photoId: v.id("_storage") },
   handler: async (ctx, args) => {

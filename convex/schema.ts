@@ -64,6 +64,9 @@ export default defineSchema({
     slotIndex: v.number(),
     joinedAt: v.number(),
     paid: v.optional(v.boolean()), // solo relevante en per_person; ausente = no pagó
+    paymentMethod: v.optional(
+      v.union(v.literal("efectivo"), v.literal("transferencia")),
+    ), // solo si paid; ausente = sin clasificar (incluye filas legacy)
   })
     .index("by_personalToken", ["personalToken"])
     .index("by_quiniela", ["quinielaId"]),

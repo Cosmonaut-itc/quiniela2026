@@ -214,3 +214,65 @@ describe("updateParticipantPhoto", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("setParticipantPayment", () => {
+  async function joinOne() {
+    const { t, q } = await setup(4);
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    return { t, q, id: ps[0]._id };
+  }
+
+  it("efectivo: paid=true y método efectivo", async () => {
+    const { t, q, id } = await joinOne();
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: id, method: "efectivo" });
+    const p = await t.run((ctx) => ctx.db.get(id));
+    expect(p?.paid).toBe(true);
+    expect(p?.paymentMethod).toBe("efectivo");
+  });
+
+  it("transferencia: paid=true y método transferencia", async () => {
+    const { t, q, id } = await joinOne();
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: id, method: "transferencia" });
+    const p = await t.run((ctx) => ctx.db.get(id));
+    expect(p?.paid).toBe(true);
+    expect(p?.paymentMethod).toBe("transferencia");
+  });
+
+  it("pending limpia paid y método", async () => {
+    const { t, q, id } = await joinOne();
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: id, method: "efectivo" });
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: id, method: "pending" });
+    const p = await t.run((ctx) => ctx.db.get(id));
+    expect(p?.paid).toBeUndefined();
+    expect(p?.paymentMethod).toBeUndefined();
+  });
+
+  it("cambia de método y mantiene paid", async () => {
+    const { t, q, id } = await joinOne();
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: id, method: "efectivo" });
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: id, method: "transferencia" });
+    const p = await t.run((ctx) => ctx.db.get(id));
+    expect(p?.paid).toBe(true);
+    expect(p?.paymentMethod).toBe("transferencia");
+  });
+
+  it("rechaza un adminToken ajeno", async () => {
+    const { t, id } = await joinOne();
+    await expect(
+      t.mutation(api.participants.setParticipantPayment, { adminToken: "ajeno", participantId: id, method: "efectivo" }),
+    ).rejects.toThrow();
+  });
+
+  it("funciona tras cerrar la quiniela (pagos tardíos)", async () => {
+    const { t, q } = await setup(4);
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: ps[0]._id, method: "efectivo" });
+    const p = await t.run((ctx) => ctx.db.get(ps[0]._id));
+    expect(p?.paid).toBe(true);
+  });
+});
