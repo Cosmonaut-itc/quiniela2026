@@ -5,10 +5,10 @@ import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
 import { readStoredToken, persistToken } from "@/lib/storage";
-import { PlayerRow } from "@/components/PlayerRow";
+import { PlayersTable } from "@/components/PlayersTable";
 import { DuelRow } from "@/components/DuelRow";
 import { Shell, BottomNav } from "@/components/Shell";
-import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
+import { SectionHeading, PrizeBanner } from "@/components/bits";
 import { prizeBanner } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,21 +141,7 @@ export default function Join() {
           </span>
         </div>
       )}
-      <SectionHeading>Tabla de jugadores</SectionHeading>
-      <div className="space-y-2.5">
-        {data.players.length === 0 ? (
-          <EmptyTile>Aún no se inscribe nadie. ¡Sé el primero!</EmptyTile>
-        ) : (
-          data.players.map((p) => <PlayerRow key={p.participantId} p={p} />)
-        )}
-        {data.freeSlots > 0 && (
-          <EmptyTile>
-            ＋ {data.freeSlots}{" "}
-            {data.freeSlots === 1 ? "lugar libre" : "lugares libres"} ·
-            esperando jugador
-          </EmptyTile>
-        )}
-      </div>
+      <PlayersTable players={data.players} freeSlots={data.freeSlots} />
 
       {/* Upcoming duels */}
       {data.upcomingDuels.length > 0 && (
