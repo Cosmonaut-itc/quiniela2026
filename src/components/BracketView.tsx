@@ -4,7 +4,15 @@ import { cn } from "@/lib/utils";
 type BracketMatch = MundialData["bracket"][number]["matches"][number];
 type Side = BracketMatch["home"];
 
-function SideRow({ side, win }: { side: Side; win: boolean }) {
+function SideRow({
+  side,
+  win,
+  showOwners,
+}: {
+  side: Side;
+  win: boolean;
+  showOwners: boolean;
+}) {
   if (!side) {
     return (
       <div className="flex items-center gap-1.5 px-2.5 py-2 text-[0.7rem] text-muted-foreground italic">
@@ -29,9 +37,11 @@ function SideRow({ side, win }: { side: Side; win: boolean }) {
         >
           {side.team.code}
         </span>
-        <span className="truncate text-[0.65rem] text-muted-foreground">
-          · {side.owner}
-        </span>
+        {showOwners && (
+          <span className="truncate text-[0.65rem] text-muted-foreground">
+            · {side.owner}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -46,7 +56,15 @@ function Score({ value }: { value: number | null }) {
   );
 }
 
-function MatchCard({ m, isFinal }: { m: BracketMatch; isFinal: boolean }) {
+function MatchCard({
+  m,
+  isFinal,
+  showOwners,
+}: {
+  m: BracketMatch;
+  isFinal: boolean;
+  showOwners: boolean;
+}) {
   const finished = m.status === "finished";
   const homeWin =
     finished && m.homeScore != null && m.awayScore != null && m.homeScore > m.awayScore;
@@ -62,8 +80,8 @@ function MatchCard({ m, isFinal }: { m: BracketMatch; isFinal: boolean }) {
     >
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1 divide-y divide-border/60">
-          <SideRow side={m.home} win={homeWin} />
-          <SideRow side={m.away} win={awayWin} />
+          <SideRow side={m.home} win={homeWin} showOwners={showOwners} />
+          <SideRow side={m.away} win={awayWin} showOwners={showOwners} />
         </div>
         {(m.homeScore != null || m.awayScore != null) && (
           <div className="flex shrink-0 flex-col items-center self-stretch border-l border-border/60 bg-muted/30">
@@ -85,7 +103,13 @@ function MatchCard({ m, isFinal }: { m: BracketMatch; isFinal: boolean }) {
  * column of match cards; the Final round gets the gold treatment. Scores show
  * when available and the winning side is highlighted.
  */
-export function BracketView({ bracket }: { bracket: MundialData["bracket"] }) {
+export function BracketView({
+  bracket,
+  showOwners = true,
+}: {
+  bracket: MundialData["bracket"];
+  showOwners?: boolean;
+}) {
   if (bracket.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
@@ -114,7 +138,12 @@ export function BracketView({ bracket }: { bracket: MundialData["bracket"] }) {
                 {round.label}
               </div>
               {round.matches.map((m, i) => (
-                <MatchCard key={i} m={m} isFinal={isFinal} />
+                <MatchCard
+                  key={i}
+                  m={m}
+                  isFinal={isFinal}
+                  showOwners={showOwners}
+                />
               ))}
             </div>
           );

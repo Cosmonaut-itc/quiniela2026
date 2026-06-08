@@ -20,3 +20,12 @@ describe("getMundial", () => {
     expect(data.bracket.length).toBeGreaterThan(0);
   });
 });
+
+it("showOwners=false en progol y true en clásica", async () => {
+  const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+  await t.mutation(internal.seed.seedFromSnapshot, {});
+  const c = await t.mutation(api.quinielas.createQuiniela, { name: "C", prizeText: "$1", numParticipants: 2 });
+  const p = await t.mutation(api.quinielas.createQuiniela, { name: "P", prizeText: "$1", numParticipants: 2, gameMode: "progol" });
+  expect((await t.query(api.mundial.getMundial, { quinielaId: c.quinielaId })).showOwners).toBe(true);
+  expect((await t.query(api.mundial.getMundial, { quinielaId: p.quinielaId })).showOwners).toBe(false);
+});

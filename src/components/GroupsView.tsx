@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
  * marked as advancing (green dot), eliminated teams are dimmed + struck through.
  * Each team carries its owner's avatar + name.
  */
-export function GroupsView({ groups }: { groups: MundialData["groups"] }) {
+export function GroupsView({
+  groups,
+  showOwners = true,
+}: {
+  groups: MundialData["groups"];
+  showOwners?: boolean;
+}) {
   return (
     <div className="space-y-3">
       {groups.map((g) => (
@@ -55,10 +61,18 @@ export function GroupsView({ groups }: { groups: MundialData["groups"] }) {
                   >
                     {r.team.name}
                   </span>
-                  <Avatar name={r.ownerName} url={r.ownerPhotoUrl} size={18} />
-                  <span className="max-w-16 truncate text-[0.7rem] text-muted-foreground">
-                    {r.ownerName}
-                  </span>
+                  {showOwners && (
+                    <>
+                      <Avatar
+                        name={r.ownerName}
+                        url={r.ownerPhotoUrl}
+                        size={18}
+                      />
+                      <span className="max-w-16 truncate text-[0.7rem] text-muted-foreground">
+                        {r.ownerName}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <span
                   className={cn(

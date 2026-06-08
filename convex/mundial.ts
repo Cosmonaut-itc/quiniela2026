@@ -2,7 +2,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { teamLite, photoUrl } from "./lib/view";
+import { teamLite, photoUrl, gameModeOf } from "./lib/view";
 import { computeGroupStandings } from "./lib/tournament";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { MundialData } from "./types";
@@ -59,6 +59,8 @@ export const getMundial = query({
       }),
     })).filter((s) => s.matches.length > 0);
 
-    return { groups, bracket };
+    const qn = await ctx.db.get(quinielaId);
+    const showOwners = qn ? gameModeOf(qn) === "clasica" : true;
+    return { showOwners, groups, bracket };
   },
 });

@@ -55,6 +55,7 @@ export type PersonalData = {
 };
 
 export type MundialData = {
+  showOwners: boolean;
   groups: { group: string;
             rows: { team: TeamLite; points: number; gd: number; gf: number;
                     ownerName: string; ownerPhotoUrl: string | null; alive: boolean }[] }[];

@@ -37,7 +37,9 @@ export default function Mundial() {
         </h1>
       </header>
       <p className="mb-4 text-sm text-muted-foreground">
-        Cada equipo lleva la cara de su dueño.
+        {data.showOwners
+          ? "Cada equipo lleva la cara de su dueño."
+          : "Grupos, posiciones y bracket del torneo."}
       </p>
 
       <Tabs defaultValue="grupos" className="w-full">
@@ -57,10 +59,10 @@ export default function Mundial() {
         </TabsList>
 
         <TabsContent value="grupos" className="mt-4">
-          <GroupsView groups={data.groups} />
+          <GroupsView groups={data.groups} showOwners={data.showOwners} />
         </TabsContent>
         <TabsContent value="bracket" className="mt-4">
-          <BracketView bracket={data.bracket} />
+          <BracketView bracket={data.bracket} showOwners={data.showOwners} />
         </TabsContent>
       </Tabs>
     </Shell>
