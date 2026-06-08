@@ -81,3 +81,79 @@ export const getGeneral = query({
     };
   },
 });
+
+/** Construye la tarjeta de pronósticos de un participante (mía en getPersonal, ajena en getCard). */
+async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"participants">): Promise<ProgolCardData> {
+  const { teamById, effRows } = await resolveQuiniela(ctx, qn._id);
+  const participants = await ctx.db.query("participants")
+    .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+  const picks = await ctx.db.query("predictions")
+    .withIndex("by_quiniela_participant", (q) => q.eq("quinielaId", qn._id)).collect();
+  const results = new Map<string, Pick>();
+  for (const mt of effRows) { const r = matchResult(mt); if (r) results.set(mt._id, r); }
+  const rows = leaderboard(
+    participants.map((p) => ({ id: p._id as string })),
+    picks.map((pk) => ({ participantId: pk.participantId as string, matchId: pk.matchId as string, pick: pk.pick as Pick })),
+    results,
+  );
+  const myRow = rows.find((r) => r.participantId === (who._id as string))!;
+  const myPickByMatch = new Map<string, Pick>();
+  for (const pk of picks) if (pk.participantId === who._id) myPickByMatch.set(pk.matchId as string, pk.pick as Pick);
+
+  const now = Date.now();
+  const finalDone = effRows.some((mt) => mt.stage === "final" && mt.status === "finished");
+  const byStage = new Map<string, ProgolMatchView[]>();
+  for (const mt of [...effRows].sort((a, b) => a.kickoffAt - b.kickoffAt)) {
+    const result = matchResult(mt);
+    const pick = myPickByMatch.get(mt._id) ?? null;
+    const view: ProgolMatchView = {
+      matchId: mt._id, stage: mt.stage, label: STAGE_LABEL[mt.stage] ?? mt.stage,
+      home: mt.homeTeamId ? teamLite(teamById.get(mt.homeTeamId as Id<"teams">)) : null,
+      away: mt.awayTeamId ? teamLite(teamById.get(mt.awayTeamId as Id<"teams">)) : null,
+      kickoffAt: mt.kickoffAt, state: matchUiState(mt, now),
+      pick, result, correct: result ? (pick != null ? pick === result : null) : null,
+      homeScore: mt.homeScore, awayScore: mt.awayScore,
+    };
+    if (!byStage.has(mt.stage)) byStage.set(mt.stage, []);
+    byStage.get(mt.stage)!.push(view);
+  }
+  const stages = [...byStage.entries()]
+    .sort((a, b) => stageRank(a[0]) - stageRank(b[0]))
+    .map(([stage, matches]) => ({ stage, label: STAGE_LABEL[stage] ?? stage, matches }));
+  const paidCount = participants.filter((p) => p.paid === true).length;
+  return {
+    mode: "progol",
+    quinielaId: qn._id as string, quinielaName: qn.name, joinToken: qn.joinToken,
+    prize: prizeView(qn, paidCount),
+    status: (finalDone ? "finished" : qn.status) as "open" | "locked" | "finished",
+    who: {
+      participantId: who._id as string, name: who.name, photoUrl: await photoUrl(ctx, who.photoId),
+      points: myRow.points, rank: myRow.rank, correct: myRow.correct, played: myRow.played,
+    },
+    stages,
+  };
+}
+
+export const getPersonal = query({
+  args: { personalToken: v.string() },
+  handler: async (ctx, args): Promise<ProgolCardData> => {
+    const me = await ctx.db.query("participants")
+      .withIndex("by_personalToken", (q) => q.eq("personalToken", args.personalToken)).first();
+    if (!me) throw new Error("Jugador no encontrado");
+    const qn = await ctx.db.get(me.quinielaId);
+    if (!qn) throw new Error("Quiniela no encontrada");
+    return buildCard(ctx, qn, me);
+  },
+});
+
+export const getCard = query({
+  args: { joinToken: v.string(), participantId: v.id("participants") },
+  handler: async (ctx, args): Promise<ProgolCardData> => {
+    const qn = await ctx.db.query("quinielas")
+      .withIndex("by_joinToken", (q) => q.eq("joinToken", args.joinToken)).first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const who = await ctx.db.get(args.participantId);
+    if (!who || who.quinielaId !== qn._id) throw new Error("Jugador no encontrado");
+    return buildCard(ctx, qn, who);
+  },
+});

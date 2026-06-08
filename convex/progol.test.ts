@@ -74,3 +74,34 @@ describe("progol.getGeneral", () => {
     expect(beto.rank).toBe(2);
   });
 });
+
+describe("progol.getPersonal / getCard", () => {
+  it("expone el estado por partido, mi pick y el acierto", async () => {
+    const { t, q } = await seededProgol();
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const matchId = await futureGroupMatch(t);
+    await t.mutation(api.progol.predict, { personalToken: a.personalToken, matchId, pick: "home" });
+    await t.run((ctx) => ctx.db.patch(matchId, { status: "finished", homeScore: 1, awayScore: 0 }));
+    const card = await t.query(api.progol.getPersonal, { personalToken: a.personalToken });
+    const mine = card.stages.flatMap((s) => s.matches).find((m) => m.matchId === matchId)!;
+    expect(mine.state).toBe("finished");
+    expect(mine.pick).toBe("home");
+    expect(mine.result).toBe("home");
+    expect(mine.correct).toBe(true);
+    expect(card.who.points).toBe(1);
+  });
+  it("getCard muestra la tarjeta de otro jugador (read-only)", async () => {
+    const { t, q } = await seededProgol();
+    const a = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const matchId = await futureGroupMatch(t);
+    await t.mutation(api.progol.predict, { personalToken: a.personalToken, matchId, pick: "draw" });
+    const aId = await t.run(async (ctx) => {
+      const ps = await ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect();
+      return ps[0]._id;
+    });
+    const card = await t.query(api.progol.getCard, { joinToken: q.joinToken, participantId: aId });
+    expect(card.who.name).toBe("Ana");
+    const mine = card.stages.flatMap((s) => s.matches).find((m) => m.matchId === matchId)!;
+    expect(mine.pick).toBe("draw");
+  });
+});
