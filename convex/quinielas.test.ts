@@ -225,8 +225,8 @@ describe("getOverview prize", () => {
     // el admin confirma dos pagos → bote 400
     const ps = await t.run((ctx) =>
       ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
-    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[0]._id, paid: true });
-    await t.mutation(api.participants.setParticipantPaid, { adminToken: q.adminToken, participantId: ps[1]._id, paid: true });
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: ps[0]._id, method: "efectivo" });
+    await t.mutation(api.participants.setParticipantPayment, { adminToken: q.adminToken, participantId: ps[1]._id, method: "efectivo" });
     ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
     expect(ov.quiniela.prize.pool).toBe(400);
     expect(ov.quiniela.prize.contributors).toBe(2);

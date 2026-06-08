@@ -55,20 +55,6 @@ export const joinQuiniela = mutation({
   },
 });
 
-export const setParticipantPaid = mutation({
-  args: { adminToken: v.string(), participantId: v.id("participants"), paid: v.boolean() },
-  handler: async (ctx, args) => {
-    const p = await ctx.db.get(args.participantId);
-    if (!p) throw new Error("Participante no encontrado");
-    const qn = await ctx.db.get(p.quinielaId);
-    if (!qn || qn.adminToken !== args.adminToken) throw new Error("No autorizado");
-    // ausente = no pagó (convención del schema); al desmarcar borramos el campo,
-    // igual que updateNotes con `notes || undefined`.
-    await ctx.db.patch(args.participantId, { paid: args.paid || undefined });
-    return { ok: true as const };
-  },
-});
-
 export const setParticipantPayment = mutation({
   args: {
     adminToken: v.string(),
