@@ -135,6 +135,11 @@ export const autoCloseDue = internalMutation({
     if (!firstMatch || Date.now() < firstMatch.kickoffAt) return;
     const open = await ctx.db.query("quinielas").withIndex("by_status", (q) => q.eq("status", "open")).collect();
     for (const qn of open) {
+      if (gameModeOf(qn) === "progol") {
+        // progol no reparte equipos; al arrancar el torneo solo cierra la inscripción.
+        await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });
+        continue;
+      }
       if (modeOf(qn) === "on_reveal") continue; // reveal is manual-only; never auto-distribute
       const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       if (participants.length === 0) continue; // leave empty quinielas open

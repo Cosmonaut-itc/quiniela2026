@@ -5,6 +5,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { NotificationItem, NotificationsData } from "./types";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import { detectSyncEvents, type NotifyIntent } from "./lib/notify";
+import { detectProgolEvents } from "./lib/progol";
+import { gameModeOf } from "./lib/view";
 
 const SOON_MS = 65 * 60_000;
 
@@ -134,6 +136,19 @@ export const detectFromSync = internalMutation({
     const tournamentStarted = !!firstMatch && now >= firstMatch.kickoffAt;
     const quinielas = await ctx.db.query("quinielas").collect();
     for (const qn of quinielas) {
+      if (gameModeOf(qn) === "progol") {
+        const participants = await ctx.db.query("participants")
+          .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
+        if (participants.length === 0) continue;
+        const { effRows } = await resolveQuiniela(ctx, qn._id);
+        const intents = detectProgolEvents({
+          quinielaId: qn._id as string, tournamentStarted,
+          effMatches: effRows.map((m) => ({ stage: m.stage, homeTeamId: m.homeTeamId, awayTeamId: m.awayTeamId })),
+          participants: participants.map((p) => ({ id: p._id as string })),
+        });
+        for (const intent of intents) await insertNotification(ctx, intent);
+        continue;
+      }
       const ownerships = await ctx.db.query("ownerships")
         .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       if (ownerships.length === 0) continue; // sin equipos repartidos no hay nada que avisar

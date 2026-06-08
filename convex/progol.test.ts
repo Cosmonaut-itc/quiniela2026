@@ -123,3 +123,33 @@ describe("progol.getAdmin / closeRegistration", () => {
     expect(qn!.status).toBe("locked");
   });
 });
+
+describe("autoCloseDue + detectFromSync (progol)", () => {
+  it("autoCloseDue cierra la inscripción de progol al primer saque", async () => {
+    const { t, q } = await seededProgol();
+    const first = await t.run((ctx) => ctx.db.query("matches").withIndex("by_kickoff").first());
+    await t.run((ctx) => ctx.db.patch(first!._id, { kickoffAt: 1 }));
+    await t.mutation(internal.quinielas.autoCloseDue, {});
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.status).toBe("locked");
+  });
+  it("detectFromSync avisa partidos desbloqueados (una sola vez)", async () => {
+    const { t, q } = await seededProgol();
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.run(async (ctx) => {
+      const teams = await ctx.db.query("teams").take(2);
+      const r32 = (await ctx.db.query("matches").collect()).find((m) => m.stage === "r32")!;
+      await ctx.db.patch(r32._id, { homeTeamId: teams[0]._id, awayTeamId: teams[1]._id });
+    });
+    const meId = await t.run(async (ctx) => {
+      const ps = await ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect();
+      return ps[0]._id;
+    });
+    await t.mutation(internal.notifications.detectFromSync, {});
+    let unlocked = await t.run((ctx) => ctx.db.query("notifications").withIndex("by_participant", (x) => x.eq("participantId", meId)).collect());
+    expect(unlocked.filter((n) => n.type === "predictions_unlocked")).toHaveLength(1);
+    await t.mutation(internal.notifications.detectFromSync, {});
+    unlocked = await t.run((ctx) => ctx.db.query("notifications").withIndex("by_participant", (x) => x.eq("participantId", meId)).collect());
+    expect(unlocked.filter((n) => n.type === "predictions_unlocked")).toHaveLength(1); // dedupe
+  });
+});
