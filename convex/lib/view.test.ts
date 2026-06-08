@@ -1,6 +1,6 @@
 // convex/lib/view.test.ts
 import { describe, it, expect } from "vitest";
-import { prizeModeOf, prizeView, sortPlayerTeams } from "./view";
+import { prizeModeOf, prizeView, sortPlayerTeams, gameModeOf } from "./view";
 
 describe("prizeModeOf", () => {
   it("treats a missing mode as fixed (legacy)", () => {
@@ -57,5 +57,18 @@ describe("sortPlayerTeams", () => {
     const copy = [...input];
     sortPlayerTeams(input);
     expect(input).toEqual(copy);
+  });
+});
+
+describe("gameModeOf", () => {
+  it("default a clasica cuando falta el campo (legacy)", () => {
+    expect(gameModeOf({})).toBe("clasica");
+  });
+  it("respeta clasica y progol explícitos", () => {
+    expect(gameModeOf({ gameMode: "clasica" })).toBe("clasica");
+    expect(gameModeOf({ gameMode: "progol" })).toBe("progol");
+  });
+  it("trata un valor desconocido como clasica", () => {
+    expect(gameModeOf({ gameMode: "otro" })).toBe("clasica");
   });
 });

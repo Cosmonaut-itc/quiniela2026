@@ -6,6 +6,14 @@ export type PlayerStatus = "alive" | "out" | "champion" | "pending";
 //   on_reveal → nobody gets teams until the admin clicks "repartir" (manual, never automatic)
 export type AssignMode = "on_join" | "on_reveal";
 
+// Modo de juego de una quiniela:
+//   clasica → se reparten los 48 equipos; gana el dueño del campeón (default / legacy)
+//   progol  → cada jugador pronostica 1/X/2 por partido; gana quien más acierte
+export type GameMode = "clasica" | "progol";
+
+// Pronóstico de un partido: local / empate / visitante (1 / X / 2).
+export type Pick = "home" | "draw" | "away";
+
 // Cómo se define el premio:
 //   fixed      → texto libre (prizeText), como hasta ahora (default / legacy)
 //   per_person → cuota por persona (entryFee); el bote crece con los inscritos

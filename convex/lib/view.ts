@@ -1,6 +1,6 @@
 // convex/lib/view.ts
 import type { Id } from "../_generated/dataModel";
-import type { TeamLite, PrizeMode, PrizeView, PlayerTeam } from "../types";
+import type { TeamLite, PrizeMode, PrizeView, PlayerTeam, GameMode } from "../types";
 
 export function teamLite(
   t: { code: string; name: string; flag: string; group: string } | null | undefined,
@@ -17,6 +17,10 @@ export async function photoUrl(
 
 export function prizeModeOf(qn: { prizeMode?: string }): PrizeMode {
   return qn.prizeMode === "per_person" ? "per_person" : "fixed";
+}
+
+export function gameModeOf(qn: { gameMode?: string }): GameMode {
+  return qn.gameMode === "progol" ? "progol" : "clasica";
 }
 
 export function prizeView(

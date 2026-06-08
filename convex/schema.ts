@@ -48,6 +48,7 @@ export default defineSchema({
     joinToken: v.string(),
     status: v.string(), // "open" | "locked" | "finished"
     assignMode: v.optional(v.string()), // "on_join" | "on_reveal"; missing = on_join (legacy)
+    gameMode: v.optional(v.string()),   // "clasica" | "progol"; ausente = "clasica" (legacy)
     championParticipantId: v.optional(v.id("participants")),
     lockedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -128,4 +129,16 @@ export default defineSchema({
     .index("by_participant", ["participantId"])
     .index("by_quiniela_audience", ["quinielaId", "audience"])
     .index("by_endpoint", ["endpoint"]),
+
+  // Pronósticos del modo Progol: una fila por (quiniela, participante, partido).
+  // `predict` hace upsert (editable hasta el saque). No existe en modo clásico.
+  predictions: defineTable({
+    quinielaId: v.id("quinielas"),
+    participantId: v.id("participants"),
+    matchId: v.id("matches"),
+    pick: v.union(v.literal("home"), v.literal("draw"), v.literal("away")),
+    updatedAt: v.number(),
+  })
+    .index("by_quiniela_participant", ["quinielaId", "participantId"])
+    .index("by_quiniela_match", ["quinielaId", "matchId"]),
 });
