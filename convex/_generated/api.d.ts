@@ -11,6 +11,7 @@
 import type * as crons from "../crons.js";
 import type * as lib_distribution from "../lib/distribution.js";
 import type * as lib_footballData from "../lib/footballData.js";
+import type * as lib_matchSelect from "../lib/matchSelect.js";
 import type * as lib_notify from "../lib/notify.js";
 import type * as lib_perQuiniela from "../lib/perQuiniela.js";
 import type * as lib_push from "../lib/push.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   "lib/distribution": typeof lib_distribution;
   "lib/footballData": typeof lib_footballData;
+  "lib/matchSelect": typeof lib_matchSelect;
   "lib/notify": typeof lib_notify;
   "lib/perQuiniela": typeof lib_perQuiniela;
   "lib/push": typeof lib_push;
