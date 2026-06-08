@@ -6,7 +6,14 @@ const STAGE: Record<string, string> = {
 };
 const STATUS: Record<string, string> = {
   SCHEDULED: "scheduled", TIMED: "scheduled", IN_PLAY: "live", PAUSED: "live",
-  FINISHED: "finished", SUSPENDED: "scheduled", POSTPONED: "scheduled",
+  FINISHED: "finished",
+  // AWARDED: resultado otorgado (walkover) — trae marcador/ganador, cuenta como finalizado.
+  AWARDED: "finished",
+  // CANCELLED: no se jugará. Lo tratamos como "finished" sin marcador; standings,
+  // bracket, lastResult y avisos ya exigen marcador/ganador, así que no contamina
+  // nada y no bloquea el cierre de la fase de grupos.
+  CANCELLED: "finished",
+  SUSPENDED: "scheduled", POSTPONED: "scheduled",
 };
 
 export type ApiMatch = {
@@ -69,10 +76,35 @@ export function mapMatches(json: RawResponse): ApiMatch[] {
   });
 }
 
-export async function fetchMatches(token: string): Promise<ApiMatch[]> {
-  const res = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
-    headers: { "X-Auth-Token": token },
-  });
+const WC_MATCHES_URL = "https://api.football-data.org/v4/competitions/WC/matches";
+const MAX_RETRY_WAIT_MS = 60_000;
+const DEFAULT_BACKOFF_MS = 1_000;
+
+/** Espera (en ms) a respetar tras un 429, leída del header `Retry-After` (segundos).
+ *  Topada a 60s; si el header falta o es inválido, usa un backoff por defecto. */
+export function retryAfterMs(header: string | null | undefined): number {
+  const secs = Number(header);
+  if (!Number.isFinite(secs) || secs <= 0) return DEFAULT_BACKOFF_MS;
+  return Math.min(Math.ceil(secs) * 1000, MAX_RETRY_WAIT_MS);
+}
+
+type FetchDeps = {
+  fetchFn?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+export async function fetchMatches(token: string, deps: FetchDeps = {}): Promise<ApiMatch[]> {
+  const fetchFn = deps.fetchFn ?? fetch;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const request = () => fetchFn(WC_MATCHES_URL, { headers: { "X-Auth-Token": token } });
+
+  let res = await request();
+  if (res.status === 429) {
+    // Rate limit: espera lo que pida el servidor y reintenta una sola vez. Si
+    // vuelve a fallar, lanza y el cron (cada 5 min) lo reintenta más tarde.
+    await sleep(retryAfterMs(res.headers.get("Retry-After")));
+    res = await request();
+  }
   if (!res.ok) throw new Error(`football-data ${res.status}`);
   return mapMatches(await res.json());
 }

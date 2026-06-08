@@ -9,6 +9,7 @@ import type { Id } from "./_generated/dataModel";
 import type { PersonalData, PlayerStatus } from "./types";
 import { insertNotification } from "./notifications";
 import { playerJoinedNotice, teamsAssignedNotice, readyToDistributeNotice } from "./lib/notify";
+import { nextMatchFor as selectNextMatch, lastResultMatchFor as selectLastResult } from "./lib/matchSelect";
 
 export const joinQuiniela = mutation({
   args: { joinToken: v.string(), name: v.string(), photoId: v.optional(v.id("_storage")) },
@@ -109,15 +110,9 @@ export const getPersonalPanel = query({
 
     const myTeamIds = ownerships.filter((o) => o.participantId === me._id).map((o) => o.teamId);
 
-    function nextMatchFor(teamId: string) {
-      return effRows
-        .filter((mt) => mt.status !== "finished" && (mt.homeTeamId === teamId || mt.awayTeamId === teamId))
-        .sort((a, b) => a.kickoffAt - b.kickoffAt)[0];
-    }
+    const nextMatchFor = (teamId: string) => selectNextMatch(effRows, teamId);
     function lastResultFor(teamId: string) {
-      const mt = effRows
-        .filter((x) => x.status === "finished" && (x.homeTeamId === teamId || x.awayTeamId === teamId))
-        .sort((a, b) => b.kickoffAt - a.kickoffAt)[0];
+      const mt = selectLastResult(effRows, teamId);
       if (!mt) return null;
       const h = teamById.get(mt.homeTeamId as Id<"teams">); const aw = teamById.get(mt.awayTeamId as Id<"teams">);
       return `${h?.flag ?? ""} ${mt.homeScore}–${mt.awayScore} ${aw?.flag ?? ""}`;
