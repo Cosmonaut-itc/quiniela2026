@@ -61,6 +61,36 @@ describe("joinQuiniela", () => {
   });
 });
 
+describe("joinQuiniela progol", () => {
+  it("permite unirse sin tope y no reparte equipos", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "P", prizeText: "$1", numParticipants: 10, gameMode: "progol",
+    });
+    for (const name of ["A", "B", "C"]) {
+      await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name });
+    }
+    const ps = await t.run((ctx) =>
+      ctx.db.query("participants").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(ps).toHaveLength(3);
+    const owns = await t.run((ctx) =>
+      ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(owns).toHaveLength(0); // progol no reparte equipos
+  });
+  it("rechaza unirse cuando ya cerró la inscripción", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "P", prizeText: "$1", numParticipants: 10, gameMode: "progol",
+    });
+    await t.run((ctx) => ctx.db.patch(q.quinielaId, { status: "locked" }));
+    await expect(
+      t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Tarde" }),
+    ).rejects.toThrow();
+  });
+});
+
 describe("getPersonalPanel", () => {
   it("returns my teams with next opponent and owner", async () => {
     const t = convexTest(schema, import.meta.glob("./**/*.*s"));

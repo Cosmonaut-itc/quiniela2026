@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { newToken } from "./lib/tokens";
 import { drawN } from "./lib/distribution";
-import { teamLite, photoUrl, prizeView } from "./lib/view";
+import { teamLite, photoUrl, prizeView, gameModeOf } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { Id } from "./_generated/dataModel";
 import type { PersonalData, PlayerStatus } from "./types";
@@ -18,9 +18,11 @@ export const joinQuiniela = mutation({
     if (!qn) throw new Error("Quiniela no encontrada");
     if (qn.status !== "open") throw new Error("Las inscripciones están cerradas");
 
+    const isProgol = gameModeOf(qn) === "progol";
     const participants = await ctx.db.query("participants").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     const k = participants.length;
-    if (k >= qn.numParticipants) throw new Error("Ya no hay lugares disponibles");
+    // progol no tiene tope (numParticipants es 0 = sin límite).
+    if (!isProgol && k >= qn.numParticipants) throw new Error("Ya no hay lugares disponibles");
 
     const name = args.name.trim().slice(0, 40);
     if (!name) throw new Error("El nombre no puede estar vacío");
@@ -30,10 +32,11 @@ export const joinQuiniela = mutation({
       photoId: args.photoId, personalToken, slotIndex: k, joinedAt: Date.now(),
     });
 
+    // Reparto de equipos: solo modo clásico. progol no reparte (se pronostica).
     // on_reveal: no teams until the admin reveals. on_join (default): draw a slot-sized
     // batch from the still-unowned pool right now.
     let assignedCount = 0;
-    if (qn.assignMode !== "on_reveal") {
+    if (!isProgol && qn.assignMode !== "on_reveal") {
       const size = qn.slotSizes[k];
       const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       const ownedSet = new Set(owned.map((o) => o.teamId));
@@ -46,10 +49,12 @@ export const joinQuiniela = mutation({
       assignedCount = picked.length;
     }
 
-    // Avisos: al admin (alguien se unió) y, si recibió equipos, al jugador. Si se llenó, al admin.
+    // Avisos: al admin (alguien se unió) y, en clásico, al jugador / "ya están todos".
     await insertNotification(ctx, playerJoinedNotice(qn._id, name, participantId));
-    if (assignedCount > 0) await insertNotification(ctx, teamsAssignedNotice(qn._id, participantId, assignedCount));
-    if (k + 1 >= qn.numParticipants) await insertNotification(ctx, readyToDistributeNotice(qn._id));
+    if (!isProgol) {
+      if (assignedCount > 0) await insertNotification(ctx, teamsAssignedNotice(qn._id, participantId, assignedCount));
+      if (k + 1 >= qn.numParticipants) await insertNotification(ctx, readyToDistributeNotice(qn._id));
+    }
 
     return { personalToken };
   },
