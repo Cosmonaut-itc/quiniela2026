@@ -156,6 +156,38 @@ describe("getOverview", () => {
     expect(ov.quiniela.assignMode).toBe("on_reveal");
     expect(ov.players[0].status).toBe("pending");
   });
+
+  it("expone los equipos de cada jugador (forma y consistencia con aliveCount)", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    // numParticipants=1 → el único jugador se lleva los 48 equipos
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 1 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    const p = ov.players[0];
+    expect(p.teams).toHaveLength(p.totalCount);
+    expect(p.teams.length).toBeGreaterThan(0);
+    // cada equipo trae la forma TeamLite + bandera de vivo
+    for (const tm of p.teams) {
+      expect(typeof tm.team.code).toBe("string");
+      expect(typeof tm.team.name).toBe("string");
+      expect(typeof tm.team.flag).toBe("string");
+      expect(typeof tm.team.group).toBe("string");
+      expect(typeof tm.alive).toBe("boolean");
+    }
+    // consistencia: los vivos del arreglo coinciden con aliveCount
+    expect(p.teams.filter((tm) => tm.alive).length).toBe(p.aliveCount);
+  });
+
+  it("devuelve teams vacío para un jugador pending (on_reveal abierto)", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 4, assignMode: "on_reveal" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const ov = await t.query(api.quinielas.getOverview, { joinToken: q.joinToken });
+    expect(ov.players[0].status).toBe("pending");
+    expect(ov.players[0].teams).toEqual([]);
+  });
 });
 
 describe("getAdmin", () => {

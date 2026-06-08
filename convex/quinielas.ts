@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
-import { teamLite, photoUrl, prizeView } from "./lib/view";
+import { teamLite, photoUrl, prizeView, sortPlayerTeams } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import type { OverviewData, PlayerStatus, AdminData, AssignMode } from "./types";
 import { insertNotification } from "./notifications";
@@ -160,8 +160,14 @@ export const getOverview = query({
       const isChampion = championParticipantId === p._id;
       const status: PlayerStatus = pendingReveal ? "pending"
         : isChampion ? "champion" : aliveCount > 0 ? "alive" : "out";
+      const teams = sortPlayerTeams(
+        mine.map((o) => ({
+          team: teamLite(teamById.get(o.teamId as Id<"teams">))!,
+          alive: states.get(o.teamId as string)!.alive,
+        })),
+      );
       return { participantId: p._id as string, name: p.name,
-        photoUrlId: p.photoId, aliveCount, totalCount: mine.length, status };
+        photoUrlId: p.photoId, aliveCount, totalCount: mine.length, status, teams };
     });
     players.sort((a, b) =>
       (b.status === "out" ? 0 : 1) - (a.status === "out" ? 0 : 1) || b.aliveCount - a.aliveCount);
@@ -186,7 +192,7 @@ export const getOverview = query({
       },
       players: await Promise.all(players.map(async (p) => ({
         participantId: p.participantId, name: p.name, photoUrl: await photoUrl(ctx, p.photoUrlId),
-        aliveCount: p.aliveCount, totalCount: p.totalCount, status: p.status,
+        aliveCount: p.aliveCount, totalCount: p.totalCount, status: p.status, teams: p.teams,
       }))),
       freeSlots: Math.max(0, qn.numParticipants - participants.length),
       upcomingDuels: upcoming.map((mt) => ({
