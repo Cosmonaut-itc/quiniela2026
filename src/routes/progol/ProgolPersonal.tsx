@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import type { Pick } from "@/../convex/types";
-import { Avatar } from "@/components/Avatar";
+import { EditableAvatar } from "@/components/EditableAvatar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PushOptIn } from "@/components/PushOptIn";
 import { Shell, BottomNav } from "@/components/Shell";
@@ -44,7 +44,7 @@ export function ProgolPersonal({ id, personalToken }: { id: string; personalToke
       <header className="grain bg-pitch header-safe relative -mx-4 overflow-hidden rounded-b-3xl border-b border-border px-4 pb-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <Avatar name={who.name} url={who.photoUrl} size={48} />
+            <EditableAvatar name={who.name} url={who.photoUrl} size={48} personalToken={personalToken} />
             <div className="min-w-0">
               <h1 className="truncate font-heading text-2xl font-extrabold tracking-tight">{who.name}</h1>
               <p className="truncate text-sm text-muted-foreground">{data.quinielaName}</p>
