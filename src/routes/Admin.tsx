@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyIcon, LinkIcon } from "lucide-react";
 import { MatchScoreEditor } from "@/components/MatchScoreEditor";
+import { ProgolAdmin } from "@/routes/progol/ProgolAdmin";
 
 function LoadingState() {
   return (
@@ -32,7 +33,11 @@ function LoadingState() {
 
 export default function Admin() {
   const { id, token } = useParams();
-  const data = useQuery(api.quinielas.getAdmin, { adminToken: token! });
+  const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
+  const data = useQuery(
+    api.quinielas.getAdmin,
+    mode?.gameMode === "clasica" ? { adminToken: token! } : "skip",
+  );
   const close = useMutation(api.quinielas.closeAndRedistribute);
   const saveNotes = useMutation(api.quinielas.updateNotes);
   const setPayment = useMutation(api.participants.setParticipantPayment);
@@ -45,6 +50,9 @@ export default function Admin() {
   const [notesEdit, setNotesEdit] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingPaymentId, setSavingPaymentId] = useState<string | null>(null);
+
+  if (mode === undefined) return <LoadingState />;
+  if (mode.gameMode === "progol") return <ProgolAdmin id={id!} adminToken={token!} />;
 
   if (data === undefined) return <LoadingState />;
 
