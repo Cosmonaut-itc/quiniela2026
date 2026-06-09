@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ProgolGeneral } from "@/routes/progol/ProgolGeneral";
 
 function LoadingState() {
   return (
@@ -45,7 +46,11 @@ function LoadingState() {
 
 export default function Join() {
   const { id, token } = useParams();
-  const data = useQuery(api.quinielas.getOverview, { joinToken: token! });
+  const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
+  const data = useQuery(
+    api.quinielas.getOverview,
+    mode?.gameMode === "clasica" ? { joinToken: token! } : "skip",
+  );
   const join = useMutation(api.participants.joinQuiniela);
   const { upload, uploading } = usePhotoUpload();
   const nav = useNavigate();
@@ -55,6 +60,8 @@ export default function Join() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
+  if (mode === undefined) return <LoadingState />;
+  if (mode.gameMode === "progol") return <ProgolGeneral id={id!} joinToken={token!} />;
   if (data === undefined) return <LoadingState />;
 
   const { quiniela } = data;

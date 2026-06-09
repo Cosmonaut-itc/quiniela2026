@@ -1,4 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
+import type { Id } from "@/../convex/_generated/dataModel";
+import { ProgolPersonal } from "@/routes/progol/ProgolPersonal";
 import { useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -36,9 +38,11 @@ function LoadingState() {
 
 export default function Personal() {
   const { id, token } = useParams();
-  const data = useQuery(api.participants.getPersonalPanel, {
-    personalToken: token!,
-  });
+  const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
+  const data = useQuery(
+    api.participants.getPersonalPanel,
+    mode?.gameMode === "clasica" ? { personalToken: token! } : "skip",
+  );
 
   const { upload } = usePhotoUpload();
   const updatePhoto = useMutation(api.participants.updateParticipantPhoto);
@@ -60,6 +64,8 @@ export default function Personal() {
     }
   }
 
+  if (mode === undefined) return <LoadingState />;
+  if (mode.gameMode === "progol") return <ProgolPersonal id={id!} personalToken={token!} />;
   if (data === undefined) return <LoadingState />;
 
   const { me } = data;

@@ -23,6 +23,7 @@ import type * as matches from "../matches.js";
 import type * as mundial from "../mundial.js";
 import type * as notifications from "../notifications.js";
 import type * as participants from "../participants.js";
+import type * as progol from "../progol.js";
 import type * as push from "../push.js";
 import type * as quinielas from "../quinielas.js";
 import type * as seed from "../seed.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   mundial: typeof mundial;
   notifications: typeof notifications;
   participants: typeof participants;
+  progol: typeof progol;
   push: typeof push;
   quinielas: typeof quinielas;
   seed: typeof seed;
