@@ -72,8 +72,9 @@ export default function Home() {
             Quiniela Mundial
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Crea tu quiniela, reparte equipos al azar y que gane el dueño del
-            campeón. 🏆
+            {gameMode === "progol"
+              ? "Crea tu quiniela, pronostica cada partido y que gane quien más acierte. 🎯"
+              : "Crea tu quiniela, reparte equipos al azar y que gane el dueño del campeón. 🏆"}
           </p>
         </header>
 
