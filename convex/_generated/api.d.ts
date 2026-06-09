@@ -14,6 +14,7 @@ import type * as lib_footballData from "../lib/footballData.js";
 import type * as lib_matchSelect from "../lib/matchSelect.js";
 import type * as lib_notify from "../lib/notify.js";
 import type * as lib_perQuiniela from "../lib/perQuiniela.js";
+import type * as lib_progol from "../lib/progol.js";
 import type * as lib_push from "../lib/push.js";
 import type * as lib_resolve from "../lib/resolve.js";
 import type * as lib_tokens from "../lib/tokens.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "lib/matchSelect": typeof lib_matchSelect;
   "lib/notify": typeof lib_notify;
   "lib/perQuiniela": typeof lib_perQuiniela;
+  "lib/progol": typeof lib_progol;
   "lib/push": typeof lib_push;
   "lib/resolve": typeof lib_resolve;
   "lib/tokens": typeof lib_tokens;
