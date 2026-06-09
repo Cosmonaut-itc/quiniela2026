@@ -57,8 +57,18 @@ export function PredictMatchRow({
 }
 
 function ResultLine({ m }: { m: ProgolMatchView }) {
+  // Defensivo: un partido "finished" debería traer siempre resultado (marcador),
+  // pero el tipo no lo garantiza; si faltara, mostramos el pick sin veredicto en
+  // vez de reventar con un acceso a PICK_LABEL[null].
+  if (m.result == null) {
+    return (
+      <p className="text-center text-[0.7rem] text-muted-foreground">
+        {m.pick == null ? "Sin resultado" : `Tu pronóstico: ${PICK_LABEL[m.pick]}`}
+      </p>
+    );
+  }
   if (m.pick == null) {
-    return <p className="text-center text-[0.7rem] text-muted-foreground">No pronosticaste · resultado: {PICK_LABEL[m.result!]}</p>;
+    return <p className="text-center text-[0.7rem] text-muted-foreground">No pronosticaste · resultado: {PICK_LABEL[m.result]}</p>;
   }
   return (
     <p className={cn("text-center text-[0.7rem] font-semibold", m.correct ? "text-alive" : "text-eliminated")}>

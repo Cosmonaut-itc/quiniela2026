@@ -24,6 +24,9 @@ export const predict = mutation({
     const qn = await ctx.db.get(me.quinielaId);
     if (!qn) throw new Error("Quiniela no encontrada");
     if (gameModeOf(qn) !== "progol") throw new Error("Esta quiniela no es de pronósticos");
+    // El bloqueo se evalúa contra el partido GLOBAL (kickoff/status reales), no
+    // contra effRows: un override de marcador del admin no debe abrir ni cerrar la
+    // ventana de edición. El puntaje sí usa effRows con overrides (ver getGeneral).
     const match = await ctx.db.get(args.matchId);
     if (!match) throw new Error("Partido no encontrado");
     if (!match.homeTeamId || !match.awayTeamId) throw new Error("Ese partido aún no tiene rivales definidos");
