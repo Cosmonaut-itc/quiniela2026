@@ -1,11 +1,18 @@
-# 🏆 Quiniela Mundial 2026
+# 🏆 Quiniela 2026
 
-App web **sin cuentas** para organizar una quiniela del Mundial 2026 entre familia y amigos.
-Alguien crea una quiniela, comparte un link, y quienes entran reciben **equipos al azar**.
-Cuando dos de tus equipos se enfrentan en un partido real del Mundial, sus dueños "juegan"
-entre sí. Un equipo queda eliminado cuando sale del torneo; quedas descalificado cuando
-**todos** tus equipos están fuera. **El dueño del equipo campeón se lleva el premio completo**
-(*winner‑take‑all*).
+App web **sin cuentas** para organizar quinielas de fútbol entre familia y amigos, sobre
+**cualquier torneo del catálogo** de football‑data.org (Mundial 2026, Champions, Premier League,
+La Liga, Serie A, Bundesliga…). Alguien crea una quiniela eligiendo torneo y modo de juego,
+comparte un link, y los datos de partidos llegan solos.
+
+Dos **modos de juego**:
+
+- **Clásica** (solo torneos eliminatorios): quienes entran reciben **equipos al azar**. Un equipo
+  muere cuando queda eliminado del torneo real; **el dueño del campeón se lleva el premio completo**
+  (*winner‑take‑all*).
+- **Progol** (cualquier torneo): cada quien pronostica **1/X/2 por partido**; un punto por acierto
+  y **gana el líder al cierre del torneo** (la final en eliminatorios, el calendario completo en
+  ligas). En ligas, los ~380 partidos se navegan por **jornada**.
 
 - **App en vivo:** https://quiniela2026-production-b5aa.up.railway.app
 - Mobile‑first, en español. Resultados **automáticos** vía API de fútbol + corrección manual del admin **por quiniela** (aislada del resto).
@@ -16,8 +23,8 @@ entre sí. Un equipo queda eliminado cuando sale del torneo; quedas descalificad
 
 Hay **dos capas de datos** en Convex:
 
-- **Capa global (verdad de la API):** equipos y partidos, sincronizados desde la API de fútbol.
-  Es la base que ven todas las quinielas.
+- **Capa global (verdad de la API):** equipos y partidos **por torneo** (`tournamentCode`),
+  sincronizados desde la API de fútbol. Cada quiniela solo "ve" los datos de SU torneo.
 - **Capa por quiniela:** la "dueñería" (qué equipos le tocan a cada quien) y los **overrides de
   marcador** — correcciones del admin que aplican **solo a esa quiniela**.
 
@@ -33,24 +40,28 @@ afecta a las demás, React queda delgado y todos los dispositivos se actualizan 
 | **Admin** | `/q/:id/admin/:adminToken` | solo el creador (compartir, cerrar/repartir, corregir y revertir marcadores) |
 | **Invitar / Ver** | `/q/:id/join/:joinToken` | se comparte; muestra la quiniela y permite unirse |
 | **Personal** | `/q/:id/me/:personalToken` | panel privado de cada jugador |
-| **Mundial** | `/q/:id/mundial` | grupos + bracket con el dueño de cada equipo (público) |
+| **Vista Torneo** | `/q/:id/torneo` (alias: `/q/:id/mundial`) | pública y **adaptativa**: grupos + bracket en eliminatorios, **tabla de posiciones** en ligas. El tab inferior muestra el nombre corto del torneo. |
 
 El `personalToken` se guarda en `localStorage` para regreso automático. Si alguien pierde su
 link, el admin se lo reenvía desde su panel.
 
 ### Flujo
 
-1. **Crear** → nombre, premio (texto libre), participantes (2–48), foto opcional y **modo de
-   reparto**: *al unirse* (cada quien recibe sus equipos al inscribirse) o *sorteo en vivo*
+1. **Crear** → elegir **torneo** del catálogo (12 competiciones del free tier; si el torneo aún no
+   tiene datos, un sync inicial on‑demand los trae al elegirlo) y **modo de juego** (las ligas solo
+   admiten Progol; los eliminatorios ambos) → nombre, premio (texto libre o cuota por persona),
+   foto opcional. En Clásica además: participantes (2 hasta el nº de equipos del torneo) y **modo
+   de reparto**: *al unirse* (cada quien recibe sus equipos al inscribirse) o *sorteo en vivo*
    (nadie recibe equipos hasta que el admin da click en "Repartir").
 2. **Unirse** → nombre + foto → en modo *al unirse*, reparto **aleatorio instantáneo** de equipos
    sin dueño; en *sorteo en vivo* el jugador queda "en espera" hasta el reparto.
 3. **Cerrar y repartir** → el admin (o el auto‑cierre al primer partido, solo en modo *al unirse*)
    reparte los equipos de los lugares vacíos al participante con menos equipos → los 48 siempre
    tienen dueño.
-4. **Sincronizar** → un cron consulta la API cada 5 min, actualiza marcadores y recalcula
-   vivos/campeón. El admin puede **corregir un marcador a mano para su quiniela** (gana sobre la
-   API solo ahí, con selector de ganador para empates de eliminatoria) y **revertirlo** al
+4. **Sincronizar** → un cron corre cada 5 min y sincroniza **los torneos con quinielas vivas**
+   (con espaciado entre torneos para respetar el rate limit del free tier), actualiza marcadores y
+   recalcula vivos/campeón. El admin puede **corregir un marcador a mano para su quiniela** (gana
+   sobre la API solo ahí, con selector de ganador para empates de eliminatoria) y **revertirlo** al
    resultado automático cuando quiera — sin afectar a ninguna otra quiniela.
 
 ---
@@ -61,7 +72,7 @@ link, el admin se lo reenvía desde su panel.
 - **Backend:** Convex (Cloud) — base de datos, funciones, *scheduled action* de sincronización, almacenamiento de fotos
 - **Pruebas:** Vitest · convex‑test · @testing‑library/react
 - **Despliegue:** frontend en **Railway** (estático con `serve`), backend en **Convex Cloud**
-- **API de fútbol:** [football‑data.org](https://www.football-data.org) (competencia `WC`, temporada 2026)
+- **API de fútbol:** [football‑data.org](https://www.football-data.org) — catálogo free tier declarado en código (`WC`, `CL`, `EC`, `PL`, `PD`, `SA`, `BL1`, `FL1`, `DED`, `PPL`, `ELC`, `BSA`)
 
 ---
 
@@ -69,21 +80,26 @@ link, el admin se lo reenvía desde su panel.
 
 ```
 convex/                     # Backend (Convex)
-  schema.ts                 # teams, matches, quinielas, participants, ownerships, matchOverrides + índices
+  schema.ts                 # teams, matches, quinielas (con tournamentCode), participants, ownerships, matchOverrides, predictions + índices
   types.ts                  # formas de retorno compartidas (también las usa el frontend)
-  quinielas.ts              # createQuiniela, getOverview, getAdmin, closeAndRedistribute, autoCloseDue, generateUploadUrl
+  quinielas.ts              # createQuiniela (multi-torneo), getOverview, getAdmin, getMode, closeAndRedistribute, autoCloseDue
   participants.ts           # joinQuiniela, getPersonalPanel
-  mundial.ts                # getMundial (grupos + bracket)
-  matches.ts                # setMatchResultManual + clearMatchOverride (admin, por quiniela) + upsert/recompute (internas)
+  tournaments.ts            # list (catálogo + estado de datos) y prepare (sync inicial on-demand)
+  mundial.ts                # getTorneo (Vista Torneo adaptativa: brackets o standings) + getMundial (alias legacy)
+  progol.ts                 # predict, getGeneral, getPersonal/getCard (tarjeta por Ronda), getAdmin
+  matches.ts                # setMatchResultManual + clearMatchOverride (admin, por quiniela) + upserts scoped por torneo (internas)
+  migrations.ts             # backfillTournamentCode (filas legacy → "WC", idempotente)
   seed.ts                   # seedFromSnapshot (interna)
-  sync.ts                   # syncMatches (internalAction, consulta la API)
+  sync.ts                   # syncTournament + syncMatches (recorre torneos activos con espaciado de rate limit)
   crons.ts                  # cron de sincronización cada 5 min
-  lib/                      # módulos puros: distribution, tournament, footballData, view, tokens,
-                            #   resolve + perQuiniela (derivación de overrides por quiniela)
+  lib/                      # módulos puros: tournaments (catálogo), distribution, tournament, standings (tabla de liga),
+                            #   progol (puntaje, Rondas, cierre de temporada), footballData, view, tokens,
+                            #   resolve + perQuiniela (resolución por quiniela, scoped por torneo)
   data/wc2026-snapshot.json # 48 equipos + 104 partidos (semilla offline + fixture de pruebas)
 src/                        # Frontend (React)
-  routes/                   # Home, Join, Personal, Mundial, Admin
-  components/               # PlayerRow, TeamCard, DuelRow, GroupsView, BracketView, Shell, ...
+  routes/                   # Home (selector de torneo), Join, Personal, Mundial (Vista Torneo), Admin, progol/
+  components/               # PlayerRow, TeamCard (TeamFlag: escudo URL o bandera emoji), DuelRow, GroupsView,
+                            #   BracketView, StandingsView, PredictMatchRow, Shell, ...
   components/ui/            # componentes generados por shadcn/ui
   lib/                      # convex (cliente), usePhotoUpload, format
 docs/superpowers/           # diseño + plan de implementación
@@ -165,6 +181,9 @@ npx convex env set FOOTBALL_DATA_TOKEN <tu-token> --prod
 # 3. Sembrar datos en producción (o disparar una sincronización en vivo)
 npx convex run seed:seedFromSnapshot '{}' --prod
 npx convex run sync:syncMatches '{}' --prod     # opcional: trae el estado actual de la API
+
+# 4. Si vienes de la versión mono-torneo: backfill de tournamentCode en filas legacy (idempotente)
+npx convex run migrations:backfillTournamentCode --prod
 ```
 
 A partir de ahí, el **cron `syncMatches` corre cada 5 minutos** automáticamente: hace upsert de
