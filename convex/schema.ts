@@ -5,15 +5,21 @@ export default defineSchema({
   teams: defineTable({
     code: v.string(),
     name: v.string(),
-    flag: v.string(),
-    group: v.string(),
+    flag: v.string(), // emoji (selecciones) o URL de escudo (clubes); la UI decide por prefijo http
+    group: v.string(), // "" en ligas (no hay grupos)
     alive: v.boolean(),
-    currentStage: v.string(), // "group" | "r32" | "r16" | "qf" | "sf" | "final" | "champion" | "out"
+    currentStage: v.string(), // "group" | "r32" | "r16" | "qf" | "sf" | "final" | "champion" | "out" | "league"
     eliminatedAt: v.optional(v.number()),
     externalId: v.string(),
+    tournamentCode: v.optional(v.string()), // ausente = "WC" (legacy); ver lib/tournaments.tournamentCodeOf
   })
     .index("by_externalId", ["externalId"])
-    .index("by_group", ["group"]),
+    .index("by_group", ["group"])
+    .index("by_tournament", ["tournamentCode"])
+    // El mismo club existe en varios torneos (Real Madrid: CL y PD) como filas
+    // separadas, porque alive/currentStage/group son por torneo. La búsqueda por
+    // externalId SOLO es única dentro de un torneo.
+    .index("by_tournament_externalId", ["tournamentCode", "externalId"]),
 
   matches: defineTable({
     stage: v.string(),
@@ -30,10 +36,14 @@ export default defineSchema({
     // siempre sigue la API. Opcional para tolerar filas viejas; se suelta en limpieza futura.
     manualOverride: v.optional(v.boolean()),
     bracketSlot: v.optional(v.string()),
+    matchday: v.optional(v.number()), // jornada (liga) — agrupador de Ronda
+    tournamentCode: v.optional(v.string()), // ausente = "WC" (legacy)
   })
     .index("by_externalId", ["externalId"])
     .index("by_stage_kickoff", ["stage", "kickoffAt"])
-    .index("by_kickoff", ["kickoffAt"]),
+    .index("by_kickoff", ["kickoffAt"])
+    .index("by_tournament_kickoff", ["tournamentCode", "kickoffAt"])
+    .index("by_tournament_externalId", ["tournamentCode", "externalId"]),
 
   quinielas: defineTable({
     name: v.string(),
@@ -52,6 +62,7 @@ export default defineSchema({
     championParticipantId: v.optional(v.id("participants")),
     lockedAt: v.optional(v.number()),
     createdAt: v.number(),
+    tournamentCode: v.optional(v.string()), // ausente = "WC" (legacy)
   })
     .index("by_adminToken", ["adminToken"])
     .index("by_joinToken", ["joinToken"])

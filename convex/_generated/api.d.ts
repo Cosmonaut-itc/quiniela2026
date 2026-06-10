@@ -19,6 +19,7 @@ import type * as lib_push from "../lib/push.js";
 import type * as lib_resolve from "../lib/resolve.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
+import type * as lib_tournaments from "../lib/tournaments.js";
 import type * as lib_view from "../lib/view.js";
 import type * as matches from "../matches.js";
 import type * as mundial from "../mundial.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   "lib/resolve": typeof lib_resolve;
   "lib/tokens": typeof lib_tokens;
   "lib/tournament": typeof lib_tournament;
+  "lib/tournaments": typeof lib_tournaments;
   "lib/view": typeof lib_view;
   matches: typeof matches;
   mundial: typeof mundial;
