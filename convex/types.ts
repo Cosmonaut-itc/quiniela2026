@@ -66,6 +66,15 @@ export type MundialData = {
                         winnerTeamId: string | null; status: string }[] }[];
 };
 
+// El torneo de una quiniela, para que la UI adapte vista y labels.
+export type TournamentInfo = { code: string; shortName: string; format: "eliminatorio" | "liga" };
+
+// Vista Torneo adaptativa (CONTEXT.md): brackets en eliminatorios, tabla en ligas.
+export type TorneoData =
+  | ({ kind: "brackets"; tournament: TournamentInfo } & MundialData)
+  | { kind: "league"; tournament: TournamentInfo;
+      standings: { team: TeamLite; points: number; played: number; gd: number; gf: number }[] };
+
 export type AdminMatchView = {
   externalId: string; stage: string; label: string;
   homeTeam: TeamLite | null; awayTeam: TeamLite | null;

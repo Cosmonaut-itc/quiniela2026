@@ -21,6 +21,46 @@ describe("getMundial", () => {
   });
 });
 
+describe("getTorneo", () => {
+  it("en liga devuelve standings con shortName del torneo", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    for (const ext of ["57", "65"]) {
+      await t.mutation(internal.matches.upsertTeam, {
+        team: { externalId: ext, name: `T${ext}`, code: ext, crest: "" }, tournamentCode: "PL", format: "liga",
+      });
+    }
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: { externalId: "m1", stage: "league", group: null, matchday: 1,
+        homeExternalId: "57", awayExternalId: "65", kickoffAt: 1,
+        homeScore: 2, awayScore: 0, status: "finished", winnerExternalId: "57", bracketSlot: null },
+    });
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Premier", prizeText: "x", numParticipants: 0, gameMode: "progol", tournamentCode: "PL",
+    });
+    const data = await t.query(api.mundial.getTorneo, { quinielaId: q.quinielaId });
+    expect(data.kind).toBe("league");
+    if (data.kind === "league") {
+      expect(data.tournament.shortName).toBe("Premier");
+      expect(data.standings[0]).toMatchObject({ points: 3, played: 1, gd: 2, gf: 2 });
+      expect(data.standings[0].team.name).toBe("T57");
+    }
+  });
+
+  it("en eliminatorio devuelve grupos y bracket (forma actual) con el torneo", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    const data = await t.query(api.mundial.getTorneo, { quinielaId: q.quinielaId });
+    expect(data.kind).toBe("brackets");
+    if (data.kind === "brackets") {
+      expect(data.tournament).toMatchObject({ code: "WC", shortName: "Mundial", format: "eliminatorio" });
+      expect(data.groups).toHaveLength(12);
+      expect(data.bracket.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("getMundial showOwners", () => {
   it("showOwners=false en progol y true en clásica", async () => {
     const t = convexTest(schema, import.meta.glob("./**/*.*s"));
