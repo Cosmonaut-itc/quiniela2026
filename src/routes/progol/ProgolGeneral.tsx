@@ -95,8 +95,8 @@ export function ProgolGeneral({ id, joinToken }: { id: string; joinToken: string
       </SectionHeading>
       <Leaderboard rows={data.leaderboard} onSelect={setViewing} />
 
-      <Link to={`/q/${id}/mundial`} className="mt-6 flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-secondary">
-        <span className="flex items-center gap-2"><span className="text-lg">🌍</span> Ver grupos y bracket del Mundial</span>
+      <Link to={`/q/${id}/torneo`} className="mt-6 flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-secondary">
+        <span className="flex items-center gap-2"><span className="text-lg">🌍</span> {mode?.tournament.format === "liga" ? "Ver tabla de posiciones del torneo" : "Ver grupos y bracket del Mundial"}</span>
         <span className="text-muted-foreground">→</span>
       </Link>
 

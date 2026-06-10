@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
@@ -10,6 +12,7 @@ import { PushOptIn } from "@/components/PushOptIn";
 import { Shell, BottomNav } from "@/components/Shell";
 import { PrizeBanner } from "@/components/bits";
 import { PredictMatchRow } from "@/components/PredictMatchRow";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { prizeBanner } from "@/lib/format";
 
@@ -28,9 +31,21 @@ export function ProgolPersonal({ id, personalToken }: { id: string; personalToke
   const data = useQuery(api.progol.getPersonal, { personalToken });
   const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
   const predict = useMutation(api.progol.predict);
+  // Ronda elegida por el usuario; null = aterrizar en la ronda en curso
+  // (estado derivado de currentRonda, sin setState en effects — regla del repo).
+  const [ronda, setRonda] = useState<string | null>(null);
 
   if (data === undefined) return <LoadingState />;
   const { who } = data;
+
+  const isLiga = mode?.tournament.format === "liga";
+  const labels = data.stages.map((s) => s.label);
+  const activeRonda = ronda ?? data.currentRonda;
+  const idxRaw = activeRonda ? labels.indexOf(activeRonda) : -1;
+  const idx = idxRaw === -1 ? 0 : idxRaw;
+  // En liga se muestra UNA jornada a la vez con navegación ◀▶; en eliminatorio,
+  // todas las etapas en lista como siempre.
+  const visibleStages = isLiga ? data.stages.slice(idx, idx + 1) : data.stages;
 
   async function onPick(matchId: string, pick: Pick) {
     try {
@@ -64,9 +79,28 @@ export function ProgolPersonal({ id, personalToken }: { id: string; personalToke
       <PushOptIn personalToken={personalToken} />
 
       <div className="mt-2 space-y-5">
-        {data.stages.map((s) => (
+        {isLiga && labels.length > 0 && (
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost" size="icon" aria-label="Jornada anterior"
+              disabled={idx === 0} onClick={() => setRonda(labels[idx - 1])}
+            >
+              <ChevronLeft />
+            </Button>
+            <h2 className="font-heading text-lg font-bold">{labels[idx]}</h2>
+            <Button
+              variant="ghost" size="icon" aria-label="Jornada siguiente"
+              disabled={idx === labels.length - 1} onClick={() => setRonda(labels[idx + 1])}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+        )}
+        {visibleStages.map((s) => (
           <div key={s.stage}>
-            <div className="mb-2 px-1 text-[0.7rem] font-bold tracking-[0.14em] text-muted-foreground uppercase">{s.label}</div>
+            {!isLiga && (
+              <div className="mb-2 px-1 text-[0.7rem] font-bold tracking-[0.14em] text-muted-foreground uppercase">{s.label}</div>
+            )}
             <div className="space-y-2.5">
               {s.matches.map((m) => <PredictMatchRow key={m.matchId} m={m} editable onPick={onPick} />)}
             </div>
@@ -74,8 +108,8 @@ export function ProgolPersonal({ id, personalToken }: { id: string; personalToke
         ))}
       </div>
 
-      <Link to={`/q/${id}/mundial`} className="mt-6 flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-secondary">
-        <span className="flex items-center gap-2"><span className="text-lg">🌍</span> Ver grupos y bracket del Mundial</span>
+      <Link to={`/q/${id}/torneo`} className="mt-6 flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-secondary">
+        <span className="flex items-center gap-2"><span className="text-lg">🌍</span> {isLiga ? "Ver tabla de posiciones del torneo" : "Ver grupos y bracket del Mundial"}</span>
         <span className="text-muted-foreground">→</span>
       </Link>
     </Shell>
