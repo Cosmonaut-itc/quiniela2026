@@ -12,6 +12,31 @@ async function seededProgol() {
   });
   return { t, q };
 }
+/** Siembra una liga (PL) con 2 equipos y 2 partidos futuros, y crea su quiniela progol. */
+async function seededLigaProgol() {
+  const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+  for (const [externalId, name, code] of [["PL-T1", "Arsenal", "ARS"], ["PL-T2", "Chelsea", "CHE"]] as const) {
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL", format: "liga",
+      team: { externalId, name, code, crest: "" },
+    });
+  }
+  for (const [externalId, matchday] of [["PL-M1", 1], ["PL-M2", 2]] as const) {
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId, stage: "league", group: null, matchday,
+        homeExternalId: "PL-T1", awayExternalId: "PL-T2",
+        kickoffAt: Date.now() + matchday * 86_400_000, homeScore: null, awayScore: null,
+        status: "scheduled", winnerExternalId: null, bracketSlot: null,
+      },
+    });
+  }
+  const q = await t.mutation(api.quinielas.createQuiniela, {
+    name: "Liga", prizeText: "$1", numParticipants: 10, gameMode: "progol", tournamentCode: "PL",
+  });
+  return { t, q };
+}
 /** Un partido de grupo con ambos equipos y saque en el futuro. */
 async function futureGroupMatch(t: Awaited<ReturnType<typeof seededProgol>>["t"]) {
   return await t.run(async (ctx) => {
@@ -100,6 +125,55 @@ describe("progol.getGeneral", () => {
     expect(beto.points).toBe(0);
     expect(ana.rank).toBe(1);
     expect(beto.rank).toBe(2);
+  });
+});
+
+describe("progol.getGeneral — cierre de temporada", () => {
+  it("liga: reporta finished y los ganadores solo cuando TODO el calendario terminó", async () => {
+    const { t, q } = await seededLigaProgol();
+    const ana = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const beto = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Beto" });
+    const [m1, m2] = await t.run(async (ctx) => {
+      const a = await ctx.db.query("matches").withIndex("by_externalId", (x) => x.eq("externalId", "PL-M1")).first();
+      const b = await ctx.db.query("matches").withIndex("by_externalId", (x) => x.eq("externalId", "PL-M2")).first();
+      return [a!._id, b!._id];
+    });
+    await t.mutation(api.progol.predict, { personalToken: ana.personalToken, matchId: m1, pick: "home" });
+    await t.mutation(api.progol.predict, { personalToken: beto.personalToken, matchId: m1, pick: "away" });
+    // Con un partido aún programado, la liga NO está terminada.
+    await t.run((ctx) => ctx.db.patch(m1, { status: "finished", homeScore: 2, awayScore: 0 }));
+    let g = await t.query(api.progol.getGeneral, { joinToken: q.joinToken });
+    expect(g.quiniela.status).toBe("open");
+    expect(g.winnerParticipantIds).toEqual([]);
+    // Al terminar TODOS los partidos, la quiniela queda finished y gana el rank 1.
+    await t.run((ctx) => ctx.db.patch(m2, { status: "finished", homeScore: 1, awayScore: 1 }));
+    g = await t.query(api.progol.getGeneral, { joinToken: q.joinToken });
+    expect(g.quiniela.status).toBe("finished");
+    const anaRow = g.leaderboard.find((r) => r.name === "Ana")!;
+    expect(anaRow.rank).toBe(1);
+    expect(g.winnerParticipantIds).toEqual([anaRow.participantId]);
+  });
+  it("Mundial: termina con la final aunque otros partidos sigan pendientes", async () => {
+    const { t, q } = await seededProgol();
+    const ana = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const beto = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Beto" });
+    const matchId = await futureGroupMatch(t);
+    await t.mutation(api.progol.predict, { personalToken: ana.personalToken, matchId, pick: "home" });
+    await t.mutation(api.progol.predict, { personalToken: beto.personalToken, matchId, pick: "away" });
+    await t.run((ctx) => ctx.db.patch(matchId, { status: "finished", homeScore: 2, awayScore: 0 }));
+    // Final terminada, pero quedan otros partidos sin terminar (regla eliminatorio ≠ liga).
+    const pendientes = await t.run(async (ctx) => {
+      const final = (await ctx.db.query("matches").collect()).find((m) => m.stage === "final")!;
+      await ctx.db.patch(final._id, { status: "finished", homeScore: 2, awayScore: 1 });
+      const ms = await ctx.db.query("matches").collect();
+      return ms.filter((m) => m.status !== "finished").length;
+    });
+    expect(pendientes).toBeGreaterThan(0);
+    const g = await t.query(api.progol.getGeneral, { joinToken: q.joinToken });
+    expect(g.quiniela.status).toBe("finished");
+    const anaRow = g.leaderboard.find((r) => r.name === "Ana")!;
+    expect(anaRow.rank).toBe(1);
+    expect(g.winnerParticipantIds).toEqual([anaRow.participantId]);
   });
 });
 

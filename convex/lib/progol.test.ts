@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   matchResult, isPredictable, matchUiState, leaderboard,
-  unlockedKnockoutStages, detectProgolEvents,
+  unlockedKnockoutStages, detectProgolEvents, isSeasonDone,
 } from "./progol";
 import type { MatchRow } from "./tournament";
 
@@ -74,6 +74,19 @@ describe("leaderboard", () => {
       results,
     );
     expect(rows.every((r) => r.rank === 1)).toBe(true);
+  });
+});
+
+describe("isSeasonDone", () => {
+  const sm = (stage: string, status: string) => ({ stage, status });
+  it("eliminatorio: termina cuando la final está finished", () => {
+    expect(isSeasonDone("eliminatorio", [sm("group", "finished"), sm("final", "finished")])).toBe(true);
+    expect(isSeasonDone("eliminatorio", [sm("final", "scheduled")])).toBe(false);
+  });
+  it("liga: termina cuando TODOS los partidos están finished y hay al menos uno", () => {
+    expect(isSeasonDone("liga", [sm("league", "finished"), sm("league", "finished")])).toBe(true);
+    expect(isSeasonDone("liga", [sm("league", "finished"), sm("league", "scheduled")])).toBe(false);
+    expect(isSeasonDone("liga", [])).toBe(false);
   });
 });
 

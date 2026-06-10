@@ -6,7 +6,7 @@ import { resolveQuiniela } from "./lib/perQuiniela";
 import { tournamentCodeOf } from "./lib/tournaments";
 import { teamLite, photoUrl, prizeView, gameModeOf } from "./lib/view";
 import {
-  matchResult, matchUiState, leaderboard, stageRank, STAGE_LABEL,
+  matchResult, matchUiState, leaderboard, stageRank, STAGE_LABEL, isSeasonDone,
 } from "./lib/progol";
 import type {
   Pick, ProgolGeneralData, ProgolCardData, ProgolMatchView, ProgolAdminData,
@@ -52,8 +52,8 @@ export const getGeneral = query({
     const qn = await ctx.db.query("quinielas")
       .withIndex("by_joinToken", (q) => q.eq("joinToken", args.joinToken)).first();
     if (!qn) throw new Error("Quiniela no encontrada");
-    const { effRows } = await resolveQuiniela(ctx, qn._id);
-    const finalDone = effRows.some((mt) => mt.stage === "final" && mt.status === "finished");
+    const { effRows, format } = await resolveQuiniela(ctx, qn._id);
+    const seasonDone = isSeasonDone(format, effRows);
     const participants = await ctx.db.query("participants")
       .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     const picks = await ctx.db.query("predictions")
@@ -74,8 +74,8 @@ export const getGeneral = query({
       };
     }));
     const paidCount = participants.filter((p) => p.paid === true).length;
-    const status = (finalDone ? "finished" : qn.status) as "open" | "locked" | "finished";
-    const winnerParticipantIds = finalDone ? board.filter((b) => b.rank === 1).map((b) => b.participantId) : [];
+    const status = (seasonDone ? "finished" : qn.status) as "open" | "locked" | "finished";
+    const winnerParticipantIds = seasonDone ? board.filter((b) => b.rank === 1).map((b) => b.participantId) : [];
     return {
       mode: "progol",
       quiniela: {
@@ -89,7 +89,7 @@ export const getGeneral = query({
 
 /** Construye la tarjeta de pronósticos de un participante (mía en getPersonal, ajena en getCard). */
 async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"participants">): Promise<ProgolCardData> {
-  const { teamById, effRows } = await resolveQuiniela(ctx, qn._id);
+  const { teamById, effRows, format } = await resolveQuiniela(ctx, qn._id);
   const participants = await ctx.db.query("participants")
     .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
   const picks = await ctx.db.query("predictions")
@@ -106,7 +106,7 @@ async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"particip
   for (const pk of picks) if (pk.participantId === who._id) myPickByMatch.set(pk.matchId as string, pk.pick as Pick);
 
   const now = Date.now();
-  const finalDone = effRows.some((mt) => mt.stage === "final" && mt.status === "finished");
+  const seasonDone = isSeasonDone(format, effRows);
   const byStage = new Map<string, ProgolMatchView[]>();
   for (const mt of [...effRows].sort((a, b) => a.kickoffAt - b.kickoffAt)) {
     const result = matchResult(mt);
@@ -130,7 +130,7 @@ async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"particip
     mode: "progol",
     quinielaId: qn._id as string, quinielaName: qn.name, joinToken: qn.joinToken,
     prize: prizeView(qn, paidCount),
-    status: (finalDone ? "finished" : qn.status) as "open" | "locked" | "finished",
+    status: (seasonDone ? "finished" : qn.status) as "open" | "locked" | "finished",
     who: {
       participantId: who._id as string, name: who.name, photoUrl: await photoUrl(ctx, who.photoId),
       points: myRow.points, rank: myRow.rank, correct: myRow.correct, played: myRow.played,
@@ -169,7 +169,7 @@ export const getAdmin = query({
     const qn = await ctx.db.query("quinielas")
       .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
     if (!qn) throw new Error("Quiniela no encontrada");
-    const { teamById, effById, effRows, overriddenMatchIds, matches } = await resolveQuiniela(ctx, qn._id);
+    const { teamById, effById, effRows, overriddenMatchIds, matches, format } = await resolveQuiniela(ctx, qn._id);
     const participants = await ctx.db.query("participants")
       .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
     const picks = await ctx.db.query("predictions")
@@ -185,12 +185,12 @@ export const getAdmin = query({
     const paidCount = participants.filter((p) => p.paid === true).length;
     const efectivoCount = participants.filter((p) => p.paymentMethod === "efectivo").length;
     const transferenciaCount = participants.filter((p) => p.paymentMethod === "transferencia").length;
-    const finalDone = effRows.some((mt) => mt.stage === "final" && mt.status === "finished");
+    const seasonDone = isSeasonDone(format, effRows);
     const sorted = [...matches].sort((a, b) => a.kickoffAt - b.kickoffAt);
     return {
       quiniela: {
         name: qn.name, photoUrl: await photoUrl(ctx, qn.photoId), prize: prizeView(qn, paidCount),
-        status: (finalDone ? "finished" : qn.status) as "open" | "locked" | "finished",
+        status: (seasonDone ? "finished" : qn.status) as "open" | "locked" | "finished",
         joinToken: qn.joinToken, notes: qn.notes ?? null, filledCount: participants.length,
         methodCounts: { efectivo: efectivoCount, transferencia: transferenciaCount },
       },

@@ -1,13 +1,24 @@
 // convex/lib/progol.ts
 import type { MatchRow } from "./tournament";
+import type { TournamentFormat } from "./tournaments";
 import type { Pick } from "../types";
 import { dedupeKey, type NotifyIntent } from "./notify";
 
 /** Etiquetas de etapa, compartidas con las vistas. */
 export const STAGE_LABEL: Record<string, string> = {
   group: "Grupos", r32: "Dieciseisavos", r16: "Octavos", qf: "Cuartos",
-  sf: "Semis", third: "3er lugar", final: "Final",
+  sf: "Semis", third: "3er lugar", final: "Final", league: "Jornada",
 };
+
+/** Fin del torneo para Progol: final jugada (eliminatorio) o calendario completo (liga). */
+export function isSeasonDone(
+  format: TournamentFormat,
+  rows: { stage: string; status: string }[],
+): boolean {
+  if (format === "eliminatorio")
+    return rows.some((m) => m.stage === "final" && m.status === "finished");
+  return rows.length > 0 && rows.every((m) => m.status === "finished");
+}
 const STAGE_ORDER = ["group", "r32", "r16", "qf", "sf", "third", "final"];
 export function stageRank(stage: string): number {
   const i = STAGE_ORDER.indexOf(stage);
