@@ -24,7 +24,9 @@ async function redistributeAndLock(
 ) {
   const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
   const ownedSet = new Set(owned.map((o) => o.teamId));
-  const allTeams = await ctx.db.query("teams").collect();
+  // Solo los equipos del torneo de la quiniela (normalización legacy: sin código = WC).
+  const allTeams = (await ctx.db.query("teams").collect())
+    .filter((tm) => tournamentCodeOf(tm) === tournamentCodeOf(qn));
   const leftovers = allTeams.filter((tm) => !ownedSet.has(tm._id)).map((tm) => tm._id as string);
   if (leftovers.length > 0) {
     const counts = participants.map((p) => ({
@@ -139,15 +141,24 @@ export const closeAndRedistribute = mutation({
   },
 });
 
-// Cron-driven: once the first match has kicked off, lock every open quiniela that
-// has at least one participant (empty quinielas stay open so nobody loses a slot).
+// Cron: cuando arranca el primer partido DEL TORNEO de cada quiniela, cierra las
+// quinielas abiertas de ese torneo con al menos un participante (las vacías quedan
+// abiertas para que nadie pierda su lugar).
 export const autoCloseDue = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const firstMatch = await ctx.db.query("matches").withIndex("by_kickoff").first();
-    if (!firstMatch || Date.now() < firstMatch.kickoffAt) return;
     const open = await ctx.db.query("quinielas").withIndex("by_status", (q) => q.eq("status", "open")).collect();
+    if (open.length === 0) return;
+    const allMatches = await ctx.db.query("matches").collect();
+    const firstKickoffByCode = new Map<string, number>();
+    for (const mt of allMatches) {
+      const code = tournamentCodeOf(mt);
+      const prev = firstKickoffByCode.get(code);
+      if (prev === undefined || mt.kickoffAt < prev) firstKickoffByCode.set(code, mt.kickoffAt);
+    }
     for (const qn of open) {
+      const first = firstKickoffByCode.get(tournamentCodeOf(qn));
+      if (first === undefined || Date.now() < first) continue;
       if (gameModeOf(qn) === "progol") {
         // progol no reparte equipos; al arrancar el torneo solo cierra la inscripción.
         await ctx.db.patch(qn._id, { status: "locked", lockedAt: Date.now() });

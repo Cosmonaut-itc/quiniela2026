@@ -3,6 +3,7 @@ import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { computeTeamStates, type MatchRow, type TeamRow, type TeamState } from "./tournament";
 import { effectiveMatches, championTeamId } from "./resolve";
+import { tournamentByCode, tournamentCodeOf } from "./tournaments";
 
 export type Resolved = {
   teams: Doc<"teams">[];
@@ -14,24 +15,35 @@ export type Resolved = {
   overriddenMatchIds: Set<string>;
   states: Map<string, TeamState>;
   championTeamId: string | null;
+  format: "eliminatorio" | "liga";
+  tournamentCode: string;
 };
 
 /**
- * Carga el estado global (equipos + partidos) y los overrides de UNA quiniela, y
- * deriva vivos/etapa/campeón PARA ESA QUINIELA. Única fuente de la resolución por
- * quiniela: todas las queries por quiniela pasan por aquí, así el aislamiento es
- * inevitable. Con cero overrides, el resultado es idéntico al baseline global.
+ * Carga el estado DEL TORNEO de la quiniela (equipos + partidos, con normalización
+ * legacy: filas sin tournamentCode = WC) y los overrides de UNA quiniela, y deriva
+ * vivos/etapa/campeón PARA ESA QUINIELA. Única fuente de la resolución por quiniela:
+ * todas las queries por quiniela pasan por aquí, así el aislamiento (por quiniela y
+ * por torneo) es inevitable. Con cero overrides, el resultado es idéntico al baseline
+ * del torneo. En ligas no hay eliminación: todos los equipos quedan alive con
+ * currentStage "league" y championTeamId es null.
  *
  * Invariantes de cobertura (por eso los callers usan `!` con seguridad):
- *  - `effById` y `effRows` tienen UNA entrada por cada partido global (`matches`),
+ *  - `effById` y `effRows` tienen UNA entrada por cada partido del torneo (`matches`),
  *    así que `effById.get(mt._id)!` es seguro para todo `mt` de `matches`.
- *  - `states` y `teamById` tienen UNA entrada por cada equipo global (computeTeamStates
- *    inicializa todos los equipos), así que `states.get(teamId)!` / `teamById.get(teamId)!`
- *    son seguros para cualquier teamId de un equipo, ownership o partido.
+ *  - `states` y `teamById` tienen UNA entrada por cada equipo del torneo, así que
+ *    `states.get(teamId)!` / `teamById.get(teamId)!` son seguros para cualquier teamId
+ *    de un equipo, ownership o partido del torneo de la quiniela.
  */
 export async function resolveQuiniela(ctx: QueryCtx, quinielaId: Id<"quinielas">): Promise<Resolved> {
-  const teams = await ctx.db.query("teams").collect();
-  const matches = await ctx.db.query("matches").collect();
+  const qn = await ctx.db.get(quinielaId);
+  if (!qn) throw new Error("Quiniela no encontrada");
+  const code = tournamentCodeOf(qn);
+  const format = tournamentByCode(code)?.format ?? "eliminatorio";
+  // Filtro en memoria (≈600 filas máx en el free tier) con normalización legacy;
+  // si el volumen crece, cambiar a withIndex("by_tournament").
+  const teams = (await ctx.db.query("teams").collect()).filter((t) => tournamentCodeOf(t) === code);
+  const matches = (await ctx.db.query("matches").collect()).filter((m) => tournamentCodeOf(m) === code);
   const overrides = await ctx.db.query("matchOverrides")
     .withIndex("by_quiniela", (q) => q.eq("quinielaId", quinielaId)).collect();
 
@@ -48,11 +60,15 @@ export async function resolveQuiniela(ctx: QueryCtx, quinielaId: Id<"quinielas">
   }));
 
   const effRows = effectiveMatches(matchRows, overrideRows);
-  const states = computeTeamStates(teamRows, effRows);
+  const states = format === "eliminatorio"
+    ? computeTeamStates(teamRows, effRows)
+    : new Map<string, TeamState>(teamRows.map((t) => [t._id, { alive: true, currentStage: "league" }]));
+  const champion = format === "eliminatorio" ? championTeamId(states) : null;
   return {
     teams, teamById: new Map(teams.map((t) => [t._id, t])), teamRows,
     matches, effRows, effById: new Map(effRows.map((mt) => [mt._id, mt])),
     overriddenMatchIds: new Set(overrides.map((o) => o.matchId as string)),
-    states, championTeamId: championTeamId(states),
+    states, championTeamId: champion,
+    format, tournamentCode: code,
   };
 }

@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
+import { tournamentCodeOf } from "./lib/tournaments";
 
 async function seeded() {
   const t = convexTest(schema, import.meta.glob("./**/*.*s"));
@@ -338,6 +339,87 @@ describe("multi-torneo", () => {
       expect(qn.slotSizes.reduce((a, b) => a + b, 0)).toBe(4);
       expect(qn.tournamentCode).toBe("WC");
     });
+  });
+
+  it("resolveQuiniela de una quiniela PL no ve equipos del Mundial", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    // 1 equipo PL (liga) + 1 equipo WC (eliminatorio): la resolución PL solo debe ver Arsenal
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "57", name: "Arsenal", code: "ARS", crest: "" }, tournamentCode: "PL", format: "liga",
+    });
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "100", name: "México", code: "MEX", crest: "" }, tournamentCode: "WC", format: "eliminatorio",
+    });
+    const res = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Premier", prizeText: "x", numParticipants: 0, gameMode: "progol", tournamentCode: "PL",
+    });
+    await t.run(async (ctx) => {
+      const qn = (await ctx.db.query("quinielas").collect()).find((q) => q.adminToken === res.adminToken)!;
+      const { resolveQuiniela } = await import("./lib/perQuiniela");
+      const resolved = await resolveQuiniela(ctx, qn._id);
+      expect(resolved.teams).toHaveLength(1);
+      expect(resolved.teams[0].name).toBe("Arsenal");
+      // rama liga: nadie se elimina, no hay campeón de bracket
+      expect(resolved.format).toBe("liga");
+      expect(resolved.tournamentCode).toBe("PL");
+      expect(resolved.states.get(resolved.teams[0]._id as string)).toMatchObject({
+        alive: true, currentStage: "league",
+      });
+      expect(resolved.championTeamId).toBeNull();
+    });
+  });
+
+  it("el reparto de Clásica al cerrar solo asigna equipos del torneo de la quiniela", async () => {
+    const t = await seeded(); // 48 equipos del Mundial (filas legacy sin tournamentCode)
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 10 });
+    // solo 2 de 10 se inscriben → el cierre reparte los equipos sobrantes
+    for (const name of ["A", "B"]) {
+      await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name });
+    }
+    // Arsenal (PL) se inserta DESPUÉS de los joins para que joinQuiniela no lo incluya en su sorteo
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "57", name: "Arsenal", code: "ARS", crest: "" }, tournamentCode: "PL", format: "liga",
+    });
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    await t.run(async (ctx) => {
+      const owns = await ctx.db.query("ownerships")
+        .withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect();
+      expect(owns).toHaveLength(48); // los 48 del Mundial; Arsenal (PL) queda fuera
+      for (const o of owns) {
+        const team = (await ctx.db.get(o.teamId))!;
+        expect(tournamentCodeOf(team)).toBe("WC");
+      }
+    });
+  });
+
+  it("el auto-cierre usa el primer kickoff del torneo de cada quiniela", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "57", name: "Arsenal", code: "ARS", crest: "" }, tournamentCode: "PL", format: "liga",
+    });
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "100", name: "México", code: "MEX", crest: "" }, tournamentCode: "WC", format: "eliminatorio",
+    });
+    // PL ya arrancó; el Mundial arranca mañana
+    await t.run(async (ctx) => {
+      await ctx.db.insert("matches", {
+        stage: "league", kickoffAt: Date.now() - 60_000, status: "scheduled", externalId: "pl-1", tournamentCode: "PL",
+      });
+      await ctx.db.insert("matches", {
+        stage: "group", kickoffAt: Date.now() + 86_400_000, status: "scheduled", externalId: "wc-1", tournamentCode: "WC",
+      });
+    });
+    const pl = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Premier", prizeText: "x", numParticipants: 0, gameMode: "progol", tournamentCode: "PL",
+    });
+    const wc = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Mundial", prizeText: "x", numParticipants: 0, gameMode: "progol", tournamentCode: "WC",
+    });
+    await t.mutation(internal.quinielas.autoCloseDue, {});
+    const qpl = await t.run((ctx) => ctx.db.get(pl.quinielaId));
+    const qwc = await t.run((ctx) => ctx.db.get(wc.quinielaId));
+    expect(qpl!.status).toBe("locked"); // su torneo ya arrancó
+    expect(qwc!.status).toBe("open");   // el suyo aún no
   });
 });
 
