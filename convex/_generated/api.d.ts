@@ -22,6 +22,7 @@ import type * as lib_tournament from "../lib/tournament.js";
 import type * as lib_tournaments from "../lib/tournaments.js";
 import type * as lib_view from "../lib/view.js";
 import type * as matches from "../matches.js";
+import type * as migrations from "../migrations.js";
 import type * as mundial from "../mundial.js";
 import type * as notifications from "../notifications.js";
 import type * as participants from "../participants.js";
@@ -30,6 +31,7 @@ import type * as push from "../push.js";
 import type * as quinielas from "../quinielas.js";
 import type * as seed from "../seed.js";
 import type * as sync from "../sync.js";
+import type * as tournaments from "../tournaments.js";
 import type * as types from "../types.js";
 
 import type {
@@ -53,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tournaments": typeof lib_tournaments;
   "lib/view": typeof lib_view;
   matches: typeof matches;
+  migrations: typeof migrations;
   mundial: typeof mundial;
   notifications: typeof notifications;
   participants: typeof participants;
@@ -61,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   quinielas: typeof quinielas;
   seed: typeof seed;
   sync: typeof sync;
+  tournaments: typeof tournaments;
   types: typeof types;
 }>;
 
