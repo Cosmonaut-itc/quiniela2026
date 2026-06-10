@@ -2,6 +2,7 @@
 export type TeamRow = { _id: string; group: string };
 export type MatchRow = {
   _id: string; stage: string; group?: string;
+  matchday?: number | null; // jornada (liga) — agrupador de Ronda
   homeTeamId: string | null; awayTeamId: string | null;
   homeScore: number | null; awayScore: number | null;
   status: string; winnerTeamId: string | null; kickoffAt: number;

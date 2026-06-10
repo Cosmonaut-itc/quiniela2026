@@ -112,6 +112,8 @@ export type ProgolGeneralData = {
 
 export type ProgolMatchView = {
   matchId: string; stage: string; label: string;
+  matchday: number | null; // jornada (liga); null en eliminatorios
+
   home: TeamLite | null; away: TeamLite | null; kickoffAt: number;
   state: "pending" | "predictable" | "locked" | "finished";
   pick: Pick | null;       // pick del DUEÑO de la tarjeta (mío en getPersonal, suyo en getCard)
@@ -126,7 +128,12 @@ export type ProgolCardData = {
   status: "open" | "locked" | "finished";
   who: { participantId: string; name: string; photoUrl: string | null;
          points: number; rank: number; correct: number; played: number };
+  // Ronda (CONTEXT.md): etapa en eliminatorios, jornada en ligas. En ligas el
+  // stage de cada grupo es la clave de jornada ("j1", "j2"…).
   stages: { stage: string; label: string; matches: ProgolMatchView[] }[];
+  // Label de la primera Ronda con partidos sin terminar (la última si todo acabó);
+  // el panel web de ligas aterriza ahí.
+  currentRonda: string | null;
 };
 
 export type ProgolAdminData = {

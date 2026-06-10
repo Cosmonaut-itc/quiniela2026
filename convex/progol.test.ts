@@ -208,6 +208,52 @@ describe("progol.getPersonal / getCard", () => {
   });
 });
 
+describe("progol por Ronda", () => {
+  it("en liga, la tarjeta agrupa por jornada y reporta la ronda actual", async () => {
+    const { t, q } = await seededLigaProgol();
+    // La jornada 1 ya se jugó; la 2 sigue programada.
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId: "PL-M1", stage: "league", group: null, matchday: 1,
+        homeExternalId: "PL-T1", awayExternalId: "PL-T2", kickoffAt: 1,
+        homeScore: 1, awayScore: 0, status: "finished", winnerExternalId: "PL-T1", bracketSlot: null,
+      },
+    });
+    const ana = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const card = await t.query(api.progol.getPersonal, { personalToken: ana.personalToken });
+    expect(card.stages.map((s) => s.label)).toEqual(["Jornada 1", "Jornada 2"]);
+    expect(card.stages[0].matches[0]).toMatchObject({ matchday: 1, state: "finished" });
+    expect(card.currentRonda).toBe("Jornada 2"); // primera ronda con partidos sin terminar
+  });
+
+  it("si todas las jornadas terminaron, currentRonda es la última", async () => {
+    const { t, q } = await seededLigaProgol();
+    for (const [externalId, matchday] of [["PL-M1", 1], ["PL-M2", 2]] as const) {
+      await t.mutation(internal.matches.upsertMatchResult, {
+        tournamentCode: "PL",
+        match: {
+          externalId, stage: "league", group: null, matchday,
+          homeExternalId: "PL-T1", awayExternalId: "PL-T2", kickoffAt: matchday,
+          homeScore: 2, awayScore: 1, status: "finished", winnerExternalId: "PL-T1", bracketSlot: null,
+        },
+      });
+    }
+    const ana = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const card = await t.query(api.progol.getPersonal, { personalToken: ana.personalToken });
+    expect(card.currentRonda).toBe("Jornada 2");
+  });
+
+  it("en el Mundial conserva la agrupación y labels por etapa", async () => {
+    const { t, q } = await seededProgol();
+    const ana = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    const card = await t.query(api.progol.getPersonal, { personalToken: ana.personalToken });
+    expect(card.stages[0]).toMatchObject({ stage: "group", label: "Grupos" });
+    const stageKeys = card.stages.map((s) => s.stage);
+    expect(stageKeys.every((s) => !s.startsWith("j"))).toBe(true);
+  });
+});
+
 describe("progol.getAdmin / closeRegistration", () => {
   it("lista participantes con puntos y expone los 104 partidos", async () => {
     const { t, q } = await seededProgol();

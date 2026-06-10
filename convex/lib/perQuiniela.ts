@@ -49,7 +49,7 @@ export async function resolveQuiniela(ctx: QueryCtx, quinielaId: Id<"quinielas">
 
   const teamRows: TeamRow[] = teams.map((t) => ({ _id: t._id as string, group: t.group }));
   const matchRows: MatchRow[] = matches.map((mt) => ({
-    _id: mt._id as string, stage: mt.stage, group: mt.group,
+    _id: mt._id as string, stage: mt.stage, group: mt.group, matchday: mt.matchday ?? null,
     homeTeamId: mt.homeTeamId ?? null, awayTeamId: mt.awayTeamId ?? null,
     homeScore: mt.homeScore ?? null, awayScore: mt.awayScore ?? null,
     status: mt.status, winnerTeamId: mt.winnerTeamId ?? null, kickoffAt: mt.kickoffAt,

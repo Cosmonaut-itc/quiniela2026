@@ -107,24 +107,34 @@ async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"particip
 
   const now = Date.now();
   const seasonDone = isSeasonDone(format, effRows);
-  const byStage = new Map<string, ProgolMatchView[]>();
+  // Agrupación por Ronda (CONTEXT.md): etapa en eliminatorios, jornada en ligas.
+  const rondaKey = (mt: { stage: string; matchday?: number | null }) =>
+    mt.stage === "league" ? `j${mt.matchday ?? 0}` : mt.stage;
+  const rondaLabel = (mt: { stage: string; matchday?: number | null }) =>
+    mt.stage === "league" ? `Jornada ${mt.matchday ?? "?"}` : (STAGE_LABEL[mt.stage] ?? mt.stage);
+  const rondaRank = (mt: { stage: string; matchday?: number | null }) =>
+    mt.stage === "league" ? (mt.matchday ?? 0) : stageRank(mt.stage);
+  const byRonda = new Map<string, { stage: string; label: string; rank: number; matches: ProgolMatchView[] }>();
   for (const mt of [...effRows].sort((a, b) => a.kickoffAt - b.kickoffAt)) {
     const result = matchResult(mt);
     const pick = myPickByMatch.get(mt._id) ?? null;
     const view: ProgolMatchView = {
-      matchId: mt._id, stage: mt.stage, label: STAGE_LABEL[mt.stage] ?? mt.stage,
+      matchId: mt._id, stage: mt.stage, label: rondaLabel(mt), matchday: mt.matchday ?? null,
       home: mt.homeTeamId ? teamLite(teamById.get(mt.homeTeamId as Id<"teams">)) : null,
       away: mt.awayTeamId ? teamLite(teamById.get(mt.awayTeamId as Id<"teams">)) : null,
       kickoffAt: mt.kickoffAt, state: matchUiState(mt, now),
       pick, result, correct: result ? (pick != null ? pick === result : null) : null,
       homeScore: mt.homeScore, awayScore: mt.awayScore,
     };
-    if (!byStage.has(mt.stage)) byStage.set(mt.stage, []);
-    byStage.get(mt.stage)!.push(view);
+    const key = rondaKey(mt);
+    if (!byRonda.has(key)) byRonda.set(key, { stage: key, label: rondaLabel(mt), rank: rondaRank(mt), matches: [] });
+    byRonda.get(key)!.matches.push(view);
   }
-  const stages = [...byStage.entries()]
-    .sort((a, b) => stageRank(a[0]) - stageRank(b[0]))
-    .map(([stage, matches]) => ({ stage, label: STAGE_LABEL[stage] ?? stage, matches }));
+  const stages = [...byRonda.values()]
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ stage, label, matches }) => ({ stage, label, matches }));
+  const firstOpen = stages.find((s) => s.matches.some((m) => m.state !== "finished"));
+  const currentRonda = (firstOpen ?? stages[stages.length - 1])?.label ?? null;
   const paidCount = participants.filter((p) => p.paid === true).length;
   return {
     mode: "progol",
@@ -136,6 +146,7 @@ async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"particip
       points: myRow.points, rank: myRow.rank, correct: myRow.correct, played: myRow.played,
     },
     stages,
+    currentRonda,
   };
 }
 
