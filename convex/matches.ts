@@ -46,6 +46,37 @@ async function teamIdByExternal(
   return legacy?._id;
 }
 
+// Resuelve un partido DENTRO del torneo indicado. Dos torneos pueden compartir
+// externalId (las selecciones WC/EC comparten ids de football-data), así que se busca
+// scoped por torneo primero, con el fallback legacy WC (filas pre-backfill sin
+// tournamentCode). Si el partido solo existe en otro torneo, se rechaza.
+async function matchByExternalScoped(
+  ctx: MutationCtx,
+  tournamentCode: string,
+  externalId: string,
+) {
+  let match = await ctx.db
+    .query("matches")
+    .withIndex("by_tournament_externalId", (q) =>
+      q.eq("tournamentCode", tournamentCode).eq("externalId", externalId),
+    )
+    .first();
+  if (!match && tournamentCode === "WC") {
+    match = await ctx.db
+      .query("matches")
+      .withIndex("by_externalId", (q) => q.eq("externalId", externalId))
+      .filter((q) => q.eq(q.field("tournamentCode"), undefined))
+      .first();
+  }
+  if (match) return match;
+  const global = await ctx.db
+    .query("matches")
+    .withIndex("by_externalId", (q) => q.eq("externalId", externalId))
+    .first();
+  if (global) throw new Error("Partido de otro torneo");
+  throw new Error("Partido no encontrado");
+}
+
 function winnerOf(
   homeId: Id<"teams"> | undefined,
   awayId: Id<"teams"> | undefined,
@@ -272,13 +303,10 @@ export const setMatchResultManual = mutation({
       .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken))
       .first();
     if (!qn) throw new Error("Quiniela no encontrada");
-    const match = await ctx.db
-      .query("matches")
-      .withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId))
-      .first();
-    if (!match) throw new Error("Partido no encontrado");
-    // Usar el tournamentCode de la quiniela para resolver al ganador (fallback a "WC")
+    // Usar el tournamentCode de la quiniela (fallback a "WC") para resolver el partido
+    // y al ganador; un partido de otro torneo se rechaza.
     const tCode = tournamentCodeOf(qn);
+    const match = await matchByExternalScoped(ctx, tCode, args.matchExternalId);
     // An explicit winner lets an admin resolve a tied knockout (penalties / extra time);
     // otherwise fall back to the score (home>away→home, away>home→away, tie→none).
     const winnerTeamId = !args.finished
@@ -321,11 +349,8 @@ export const clearMatchOverride = mutation({
       .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken))
       .first();
     if (!qn) throw new Error("Quiniela no encontrada");
-    const match = await ctx.db
-      .query("matches")
-      .withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId))
-      .first();
-    if (!match) throw new Error("Partido no encontrado");
+    // Resolver el partido dentro del torneo de la quiniela; otro torneo se rechaza.
+    const match = await matchByExternalScoped(ctx, tournamentCodeOf(qn), args.matchExternalId);
     const existing = await ctx.db
       .query("matchOverrides")
       .withIndex("by_quiniela_match", (q) =>

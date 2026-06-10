@@ -205,6 +205,42 @@ describe("multi-torneo", () => {
     });
   });
 
+  /** Quiniela WC (seed legacy) + un partido PL global que su admin NO debe poder tocar. */
+  async function wcQuinielaConPartidoPL() {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "F", prizeText: "$1", numParticipants: 2 });
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId: "PL-M1", stage: "league", group: null, matchday: 1,
+        homeExternalId: null, awayExternalId: null, kickoffAt: 100,
+        homeScore: null, awayScore: null, status: "scheduled",
+        winnerExternalId: null, bracketSlot: null,
+      },
+    });
+    return { t, q };
+  }
+
+  it("setMatchResultManual rechaza un partido de otro torneo", async () => {
+    const { t, q } = await wcQuinielaConPartidoPL();
+    await expect(t.mutation(api.matches.setMatchResultManual, {
+      adminToken: q.adminToken, matchExternalId: "PL-M1",
+      homeScore: 1, awayScore: 0, finished: true,
+    })).rejects.toThrow(/otro torneo/);
+    // y no queda un override huérfano colgando de la quiniela
+    const ovrs = await t.run((ctx) =>
+      ctx.db.query("matchOverrides").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(ovrs).toHaveLength(0);
+  });
+
+  it("clearMatchOverride rechaza un partido de otro torneo", async () => {
+    const { t, q } = await wcQuinielaConPartidoPL();
+    await expect(t.mutation(api.matches.clearMatchOverride, {
+      adminToken: q.adminToken, matchExternalId: "PL-M1",
+    })).rejects.toThrow(/otro torneo/);
+  });
+
   it("upsertMatchResult resuelve equipos dentro del torneo y guarda matchday", async () => {
     const t = convexTest(schema, modules);
     for (const [code, ext] of [["PL", "57"], ["PL", "65"], ["PD", "57"]] as const) {
