@@ -1,8 +1,10 @@
 // Catálogo de Torneos (ADR-0001): las competiciones del free tier de
 // football-data.org, declaradas en código porque formato y nombre corto
 // requieren curaduría y cambian ~1 vez al año.
+import type { GameMode } from "../types";
+
 export type TournamentFormat = "eliminatorio" | "liga";
-export type GameMode = "clasica" | "progol";
+export type { GameMode };
 
 export type Tournament = {
   code: string;        // código football-data (path de la API)
@@ -11,7 +13,7 @@ export type Tournament = {
   format: TournamentFormat;
 };
 
-export const TOURNAMENTS: Tournament[] = [
+export const TOURNAMENTS: readonly Tournament[] = [
   { code: "WC",  name: "Copa del Mundo 2026",      shortName: "Mundial",     format: "eliminatorio" },
   { code: "CL",  name: "UEFA Champions League",    shortName: "Champions",   format: "eliminatorio" },
   { code: "EC",  name: "Eurocopa",                 shortName: "Euro",        format: "eliminatorio" },
