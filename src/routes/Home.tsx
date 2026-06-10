@@ -46,7 +46,10 @@ export default function Home() {
     if (t && t.teamCount === 0) {
       setPreparing(true);
       try {
-        await prepare({ code });
+        const result = await prepare({ code });
+        if (result.teamCount > 0 && n > result.teamCount) {
+          setN(result.teamCount);
+        }
       } catch (e) {
         toast.error(
           e instanceof Error ? e.message : "No se pudo preparar el torneo",
@@ -65,7 +68,7 @@ export default function Home() {
       const res = await create({
         name,
         prizeText: prizeMode === "per_person" ? "" : prize,
-        numParticipants: n,
+        numParticipants: Math.min(n, maxParticipants),
         photoId: photoId as Id<"_storage"> | undefined,
         assignMode,
         prizeMode,
@@ -75,6 +78,8 @@ export default function Home() {
         tournamentCode,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo crear la quiniela");
     } finally {
       setBusy(false);
     }
@@ -82,7 +87,8 @@ export default function Home() {
 
   const disabled =
     busy || uploading || preparing || !name.trim() || n < 2 ||
-    (prizeMode === "per_person" && fee < 1);
+    (prizeMode === "per_person" && fee < 1) ||
+    (tournament !== undefined && tournament.teamCount === 0);
 
   return (
     <Shell className="flex min-h-svh flex-col justify-center">
@@ -98,7 +104,7 @@ export default function Home() {
             {tournament?.name ?? "Mundial 2026"}
           </p>
           <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight">
-            Quiniela Mundial
+            Quiniela {tournament?.shortName ?? "Mundial"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {effectiveGameMode === "progol"
@@ -134,7 +140,7 @@ export default function Home() {
                       aria-pressed={active}
                       disabled={preparing}
                       className={
-                        "flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-left text-sm transition-colors " +
+                        "flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-left text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed " +
                         (active
                           ? "border-primary bg-primary/10 text-foreground"
                           : "border-border bg-card text-muted-foreground hover:border-foreground/30")
