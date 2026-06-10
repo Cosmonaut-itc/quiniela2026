@@ -3,7 +3,7 @@ import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { computeTeamStates, type MatchRow, type TeamRow, type TeamState } from "./tournament";
 import { effectiveMatches, championTeamId } from "./resolve";
-import { tournamentByCode, tournamentCodeOf } from "./tournaments";
+import { tournamentByCode, tournamentCodeOf, type TournamentFormat } from "./tournaments";
 
 export type Resolved = {
   teams: Doc<"teams">[];
@@ -15,7 +15,7 @@ export type Resolved = {
   overriddenMatchIds: Set<string>;
   states: Map<string, TeamState>;
   championTeamId: string | null;
-  format: "eliminatorio" | "liga";
+  format: TournamentFormat;
   tournamentCode: string;
 };
 

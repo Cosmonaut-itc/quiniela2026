@@ -142,8 +142,8 @@ export const closeAndRedistribute = mutation({
 });
 
 // Cron: cuando arranca el primer partido DEL TORNEO de cada quiniela, cierra las
-// quinielas abiertas de ese torneo con al menos un participante (las vacías quedan
-// abiertas para que nadie pierda su lugar).
+// quinielas abiertas de ese torneo. Clásica exige al menos un participante (las vacías
+// quedan abiertas para que nadie pierda su lugar); progol cierra la inscripción siempre.
 export const autoCloseDue = internalMutation({
   args: {},
   handler: async (ctx) => {

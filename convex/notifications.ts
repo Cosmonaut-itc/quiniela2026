@@ -7,7 +7,6 @@ import { resolveQuiniela } from "./lib/perQuiniela";
 import { detectSyncEvents, type NotifyIntent } from "./lib/notify";
 import { detectProgolEvents } from "./lib/progol";
 import { gameModeOf } from "./lib/view";
-import { tournamentCodeOf } from "./lib/tournaments";
 
 const SOON_MS = 65 * 60_000;
 
@@ -130,40 +129,34 @@ export const markRead = mutation({
 /** Recorre las quinielas, deriva su estado efectivo (con overrides) e inserta los avisos
  *  por sincronización que falten. Se llama al final de syncMatches.
  *
- *  INVARIANTE DE TORNEO: cada quiniela solo "ve" los partidos de su propio torneo.
- *  `resolveQuiniela` carga TODOS los partidos (por diseño — soporta overrides globales),
- *  pero aquí filtramos `effRows` a los que pertenecen al torneo de la quiniela ANTES de
- *  pasarlos a los detectores. Esto evita que partidos de otro torneo generen avisos y
- *  previene la explosión del scheduler (>1000 ctx.scheduler.runAfter en una mutación). */
+ *  INVARIANTE DE TORNEO: cada quiniela solo "ve" los partidos de su propio torneo porque
+ *  `resolveQuiniela` es LA costura única de scoping — su resolución ya viene filtrada al
+ *  torneo de la quiniela (filas legacy sin tournamentCode se normalizan a WC). Por eso
+ *  `matches`/`effRows` van directo a los detectores sin re-filtrar: partidos de otro
+ *  torneo nunca generan avisos, lo que además previene la explosión del scheduler
+ *  (>1000 ctx.scheduler.runAfter en una mutación). */
 export const detectFromSync = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
     const quinielas = await ctx.db.query("quinielas").collect();
     for (const qn of quinielas) {
-      const qnCode = tournamentCodeOf(qn);
-
       if (gameModeOf(qn) === "progol") {
         // Cheap guard: sin participantes no hay nada que avisar.
         const participants = await ctx.db.query("participants")
           .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
         if (participants.length === 0) continue;
 
-        // Una sola resolución por quiniela.
+        // Una sola resolución por quiniela (ya scoped a su torneo).
         const { matches, effRows } = await resolveQuiniela(ctx, qn._id);
-        const inTournament = new Set(
-          matches.filter((m) => tournamentCodeOf(m) === qnCode).map((m) => m._id as string),
-        );
-        const scopedRows = effRows.filter((m) => inTournament.has(m._id));
-        const scopedMatches = matches.filter((m) => inTournament.has(m._id as string));
-        const firstKickoff = scopedMatches.length > 0
-          ? Math.min(...scopedMatches.map((m) => m.kickoffAt))
+        const firstKickoff = matches.length > 0
+          ? Math.min(...matches.map((m) => m.kickoffAt))
           : Infinity;
         const tournamentStarted = now >= firstKickoff;
 
         const intents = detectProgolEvents({
           quinielaId: qn._id as string, tournamentStarted,
-          effMatches: scopedRows.map((m) => ({ stage: m.stage, homeTeamId: m.homeTeamId, awayTeamId: m.awayTeamId })),
+          effMatches: effRows.map((m) => ({ stage: m.stage, homeTeamId: m.homeTeamId, awayTeamId: m.awayTeamId })),
           participants: participants.map((p) => ({ id: p._id as string })),
         });
         for (const intent of intents) await insertNotification(ctx, intent);
@@ -175,15 +168,10 @@ export const detectFromSync = internalMutation({
         .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       if (ownerships.length === 0) continue;
 
-      // Una sola resolución por quiniela.
+      // Una sola resolución por quiniela (ya scoped a su torneo).
       const { matches, effRows, teamById, states } = await resolveQuiniela(ctx, qn._id);
-      const inTournament = new Set(
-        matches.filter((m) => tournamentCodeOf(m) === qnCode).map((m) => m._id as string),
-      );
-      const scopedRows = effRows.filter((m) => inTournament.has(m._id));
-      const scopedMatches = matches.filter((m) => inTournament.has(m._id as string));
-      const firstKickoff = scopedMatches.length > 0
-        ? Math.min(...scopedMatches.map((m) => m.kickoffAt))
+      const firstKickoff = matches.length > 0
+        ? Math.min(...matches.map((m) => m.kickoffAt))
         : Infinity;
       const tournamentStarted = now >= firstKickoff;
 
@@ -203,7 +191,7 @@ export const detectFromSync = internalMutation({
       }));
       const intents = detectSyncEvents({
         quinielaId: qn._id as string, now, soonMs: SOON_MS, tournamentStarted,
-        teamById: teamLiteById, effMatches: scopedRows, states, ownerByTeam, participants: pInput,
+        teamById: teamLiteById, effMatches: effRows, states, ownerByTeam, participants: pInput,
       });
       for (const intent of intents) await insertNotification(ctx, intent);
     }
