@@ -52,6 +52,34 @@ describe("progol.predict", () => {
     });
     await expect(t.mutation(api.progol.predict, { personalToken, matchId: blankId, pick: "home" })).rejects.toThrow();
   });
+  it("rechaza un partido de otro torneo", async () => {
+    const { t, q } = await seededProgol(); // quiniela WC
+    const { personalToken } = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    // Sembrar un partido PL futuro con rivales definidos (pasaría los demás guards).
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL", format: "liga",
+      team: { externalId: "PL-T1", name: "Arsenal", code: "ARS", crest: "" },
+    });
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL", format: "liga",
+      team: { externalId: "PL-T2", name: "Chelsea", code: "CHE", crest: "" },
+    });
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId: "PL-M1", stage: "league", group: null, matchday: 1,
+        homeExternalId: "PL-T1", awayExternalId: "PL-T2",
+        kickoffAt: Date.now() + 86_400_000, homeScore: null, awayScore: null,
+        status: "scheduled", winnerExternalId: null, bracketSlot: null,
+      },
+    });
+    const plMatchId = await t.run(async (ctx) => {
+      const m = await ctx.db.query("matches").withIndex("by_externalId", (x) => x.eq("externalId", "PL-M1")).first();
+      return m!._id;
+    });
+    await expect(t.mutation(api.progol.predict, { personalToken, matchId: plMatchId, pick: "home" }))
+      .rejects.toThrow(/otro torneo/);
+  });
 });
 
 describe("progol.getGeneral", () => {

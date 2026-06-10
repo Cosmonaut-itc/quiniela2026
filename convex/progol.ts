@@ -3,6 +3,7 @@ import { mutation, query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { resolveQuiniela } from "./lib/perQuiniela";
+import { tournamentCodeOf } from "./lib/tournaments";
 import { teamLite, photoUrl, prizeView, gameModeOf } from "./lib/view";
 import {
   matchResult, matchUiState, leaderboard, stageRank, STAGE_LABEL,
@@ -29,6 +30,7 @@ export const predict = mutation({
     // ventana de edición. El puntaje sí usa effRows con overrides (ver getGeneral).
     const match = await ctx.db.get(args.matchId);
     if (!match) throw new Error("Partido no encontrado");
+    if (tournamentCodeOf(match) !== tournamentCodeOf(qn)) throw new Error("Partido de otro torneo");
     if (!match.homeTeamId || !match.awayTeamId) throw new Error("Ese partido aún no tiene rivales definidos");
     if (match.status !== "scheduled" || Date.now() >= match.kickoffAt) throw new Error("Ese partido ya cerró");
 
