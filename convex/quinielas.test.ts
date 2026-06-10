@@ -350,6 +350,18 @@ describe("multi-torneo", () => {
     await t.mutation(internal.matches.upsertTeam, {
       team: { externalId: "100", name: "México", code: "MEX", crest: "" }, tournamentCode: "WC", format: "eliminatorio",
     });
+    // AC1 también aplica a partidos: un partido PL y uno WC globales; la resolución PL solo ve el suyo
+    for (const [code, ext, stage] of [["PL", "PL-M1", "league"], ["WC", "WC-M1", "group"]] as const) {
+      await t.mutation(internal.matches.upsertMatchResult, {
+        tournamentCode: code,
+        match: {
+          externalId: ext, stage, group: null, matchday: 1,
+          homeExternalId: null, awayExternalId: null, kickoffAt: 100,
+          homeScore: null, awayScore: null, status: "scheduled",
+          winnerExternalId: null, bracketSlot: null,
+        },
+      });
+    }
     const res = await t.mutation(api.quinielas.createQuiniela, {
       name: "Premier", prizeText: "x", numParticipants: 0, gameMode: "progol", tournamentCode: "PL",
     });
@@ -359,6 +371,10 @@ describe("multi-torneo", () => {
       const resolved = await resolveQuiniela(ctx, qn._id);
       expect(resolved.teams).toHaveLength(1);
       expect(resolved.teams[0].name).toBe("Arsenal");
+      // ... ni partidos del Mundial: 2 partidos globales, solo el PL en la vista
+      expect(await ctx.db.query("matches").collect()).toHaveLength(2);
+      expect(resolved.matches).toHaveLength(1);
+      expect(resolved.matches[0].externalId).toBe("PL-M1");
       // rama liga: nadie se elimina, no hay campeón de bracket
       expect(resolved.format).toBe("liga");
       expect(resolved.tournamentCode).toBe("PL");
