@@ -244,6 +244,12 @@ describe("progol por Ronda", () => {
     expect(card.currentRonda).toBe("Jornada 2");
   });
 
+  it("getAdmin etiqueta los partidos de liga por jornada", async () => {
+    const { t, q } = await seededLigaProgol();
+    const admin = await t.query(api.progol.getAdmin, { adminToken: q.adminToken });
+    expect(admin.matches.map((m) => m.label)).toEqual(["Jornada 1", "Jornada 2"]);
+  });
+
   it("en el Mundial conserva la agrupación y labels por etapa", async () => {
     const { t, q } = await seededProgol();
     const ana = await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });

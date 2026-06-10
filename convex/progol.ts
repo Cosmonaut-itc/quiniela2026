@@ -6,7 +6,7 @@ import { resolveQuiniela } from "./lib/perQuiniela";
 import { tournamentCodeOf } from "./lib/tournaments";
 import { teamLite, photoUrl, prizeView, gameModeOf } from "./lib/view";
 import {
-  matchResult, matchUiState, leaderboard, stageRank, STAGE_LABEL, isSeasonDone,
+  matchResult, matchUiState, leaderboard, stageRank, rondaLabel, isSeasonDone,
 } from "./lib/progol";
 import type {
   Pick, ProgolGeneralData, ProgolCardData, ProgolMatchView, ProgolAdminData,
@@ -110,8 +110,6 @@ async function buildCard(ctx: QueryCtx, qn: Doc<"quinielas">, who: Doc<"particip
   // Agrupación por Ronda (CONTEXT.md): etapa en eliminatorios, jornada en ligas.
   const rondaKey = (mt: { stage: string; matchday?: number | null }) =>
     mt.stage === "league" ? `j${mt.matchday ?? 0}` : mt.stage;
-  const rondaLabel = (mt: { stage: string; matchday?: number | null }) =>
-    mt.stage === "league" ? `Jornada ${mt.matchday ?? "?"}` : (STAGE_LABEL[mt.stage] ?? mt.stage);
   const rondaRank = (mt: { stage: string; matchday?: number | null }) =>
     mt.stage === "league" ? (mt.matchday ?? 0) : stageRank(mt.stage);
   const byRonda = new Map<string, { stage: string; label: string; rank: number; matches: ProgolMatchView[] }>();
@@ -216,7 +214,7 @@ export const getAdmin = query({
         const e = effById.get(mt._id as string)!;
         const winner = e.winnerTeamId ? teamById.get(e.winnerTeamId as Id<"teams">) : null;
         return {
-          externalId: mt.externalId, stage: mt.stage, label: STAGE_LABEL[mt.stage] ?? mt.stage,
+          externalId: mt.externalId, stage: mt.stage, label: rondaLabel(mt),
           homeTeam: mt.homeTeamId ? teamLite(teamById.get(mt.homeTeamId)) : null,
           awayTeam: mt.awayTeamId ? teamLite(teamById.get(mt.awayTeamId)) : null,
           homeExternalId: mt.homeTeamId ? teamById.get(mt.homeTeamId)?.externalId ?? null : null,

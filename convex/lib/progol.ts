@@ -10,6 +10,11 @@ export const STAGE_LABEL: Record<string, string> = {
   sf: "Semis", third: "3er lugar", final: "Final", league: "Jornada",
 };
 
+/** Label de la Ronda de un partido: jornada en ligas, etapa en eliminatorios. */
+export function rondaLabel(mt: { stage: string; matchday?: number | null }): string {
+  return mt.stage === "league" ? `Jornada ${mt.matchday ?? "?"}` : (STAGE_LABEL[mt.stage] ?? mt.stage);
+}
+
 /** Fin del torneo para Progol: final jugada (eliminatorio) o calendario completo (liga). */
 export function isSeasonDone(
   format: TournamentFormat,
