@@ -54,7 +54,8 @@ export const prepare = action({
     if (!tournamentByCode(code)) throw new Error("Torneo fuera del catálogo");
     const token = process.env.FOOTBALL_DATA_TOKEN;
     if (!token) throw new Error("missing FOOTBALL_DATA_TOKEN");
-    await ctx.runAction(internal.sync.syncTournament, { code, withTeams: true });
+    const result = await ctx.runAction(internal.sync.syncTournament, { code, withTeams: true });
+    if (!result.ok) throw new Error(result.error ?? "No se pudo sincronizar el torneo");
     const listed = await ctx.runQuery(api.tournaments.list, {});
     return { teamCount: listed.find((t) => t.code === code)?.teamCount ?? 0 };
   },
