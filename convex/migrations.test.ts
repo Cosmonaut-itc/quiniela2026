@@ -44,3 +44,50 @@ describe("backfillTournamentCode", () => {
     });
   });
 });
+
+describe("cleanupForeignOwnerships", () => {
+  it("borra ownerships de otro torneo y conserva las del torneo (incl. legacy)", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async (ctx) => {
+      const quinielaId = await ctx.db.insert("quinielas", {
+        name: "Mundialera", prizeText: "", numParticipants: 4, slotSizes: [12, 12, 12, 12],
+        adminToken: "a", joinToken: "j", status: "locked", createdAt: 1,
+        tournamentCode: "WC",
+      });
+      const participantId = await ctx.db.insert("participants", {
+        quinielaId, name: "Ana", personalToken: "p1", slotIndex: 0, joinedAt: 1,
+      });
+      const wcTeamId = await ctx.db.insert("teams", {
+        code: "MEX", name: "México", flag: "🇲🇽", group: "A",
+        alive: true, currentStage: "group", externalId: "wc1", tournamentCode: "WC",
+      });
+      const plTeamId = await ctx.db.insert("teams", {
+        code: "ARS", name: "Arsenal", flag: "https://crest", group: "",
+        alive: true, currentStage: "league", externalId: "pl1", tournamentCode: "PL",
+      });
+      // Equipo legacy sin tournamentCode: normaliza a WC, NO debe borrarse.
+      const legacyTeamId = await ctx.db.insert("teams", {
+        code: "BRA", name: "Brasil", flag: "🇧🇷", group: "B",
+        alive: true, currentStage: "group", externalId: "wc2",
+      });
+      await ctx.db.insert("ownerships", { quinielaId, teamId: wcTeamId, participantId });
+      await ctx.db.insert("ownerships", { quinielaId, teamId: plTeamId, participantId });
+      await ctx.db.insert("ownerships", { quinielaId, teamId: legacyTeamId, participantId });
+      return { wcTeamId, plTeamId, legacyTeamId };
+    });
+
+    const first = await t.mutation(internal.migrations.cleanupForeignOwnerships, {});
+    expect(first).toEqual({ deleted: 1 });
+
+    await t.run(async (ctx) => {
+      const teamIds = (await ctx.db.query("ownerships").collect()).map((o) => o.teamId);
+      expect(teamIds).toHaveLength(2);
+      expect(teamIds).toContain(ids.wcTeamId);
+      expect(teamIds).toContain(ids.legacyTeamId);
+      expect(teamIds).not.toContain(ids.plTeamId);
+    });
+
+    const second = await t.mutation(internal.migrations.cleanupForeignOwnerships, {});
+    expect(second).toEqual({ deleted: 0 });
+  });
+});
