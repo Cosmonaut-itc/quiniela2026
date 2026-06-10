@@ -241,6 +241,33 @@ describe("multi-torneo", () => {
     })).rejects.toThrow(/otro torneo/);
   });
 
+  it("setMatchResultManual acepta un partido legacy sin tournamentCode (fallback WC)", async () => {
+    const t = convexTest(schema, modules);
+    // Sembrar datos legacy: seedFromSnapshot inserta filas SIN tournamentCode (pre-backfill)
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    // Obtener un partido legacy y confirmar que carece de tournamentCode
+    const legacyMatch = await t.run((ctx) =>
+      ctx.db.query("matches").first());
+    expect(legacyMatch).not.toBeNull();
+    expect(legacyMatch!.tournamentCode).toBeUndefined(); // falla si el seed ya estampa WC
+    const externalId = legacyMatch!.externalId;
+    // Crear quiniela WC (sin tournamentCode → defaults WC via tournamentCodeOf)
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "LegacyTest", prizeText: "$0", numParticipants: 2 });
+    // Llamar setMatchResultManual: debe encontrar el partido por el fallback legacy WC
+    const result = await t.mutation(api.matches.setMatchResultManual, {
+      adminToken: q.adminToken, matchExternalId: externalId,
+      homeScore: 2, awayScore: 1, finished: true,
+    });
+    expect(result).toEqual({ ok: true });
+    // Verificar que se guardó exactamente un override para esta quiniela
+    const ovrs = await t.run((ctx) =>
+      ctx.db.query("matchOverrides").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
+    expect(ovrs).toHaveLength(1);
+    expect(ovrs[0].homeScore).toBe(2);
+    expect(ovrs[0].awayScore).toBe(1);
+    expect(ovrs[0].status).toBe("finished");
+  });
+
   it("upsertMatchResult resuelve equipos dentro del torneo y guarda matchday", async () => {
     const t = convexTest(schema, modules);
     for (const [code, ext] of [["PL", "57"], ["PL", "65"], ["PD", "57"]] as const) {
