@@ -55,6 +55,10 @@ describe("runSyncCycle", () => {
 
       expect(synced).toEqual(["WC", "SA"]);
       expect(syncOne).toHaveBeenCalledTimes(3);
+      // El rate-limiting se mantiene aunque un torneo falle: 2 pausas entre 3 llamadas.
+      expect(pause).toHaveBeenCalledTimes(2);
+      expect(pause).toHaveBeenNthCalledWith(1, SPACING_MS);
+      expect(pause).toHaveBeenNthCalledWith(2, SPACING_MS);
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const mensaje = String(errorSpy.mock.calls[0]?.join(" "));
       expect(mensaje).toContain("PL");
@@ -76,6 +80,10 @@ describe("runSyncCycle", () => {
 
       expect(synced).toEqual(["WC", "SA"]);
       expect(syncOne).toHaveBeenCalledTimes(3);
+      // El rate-limiting se mantiene aunque un torneo falle: 2 pausas entre 3 llamadas.
+      expect(pause).toHaveBeenCalledTimes(2);
+      expect(pause).toHaveBeenNthCalledWith(1, SPACING_MS);
+      expect(pause).toHaveBeenNthCalledWith(2, SPACING_MS);
       // El fallo queda en los logs de Convex con código y error.
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const mensaje = String(errorSpy.mock.calls[0]?.join(" "));
