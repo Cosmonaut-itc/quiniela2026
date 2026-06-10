@@ -25,8 +25,9 @@ async function closedSolo(t: T, name: string) {
 async function assignKnockout(t: T) {
   const km = await t.run((ctx) => ctx.db.query("matches").filter((q) => q.neq(q.field("stage"), "group")).first());
   await t.mutation(internal.matches.upsertMatchResult, {
+    tournamentCode: "WC",
     match: { externalId: km!.externalId, stage: km!.stage, group: null,
-      homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+      matchday: null, homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
       homeScore: null, awayScore: null, status: "scheduled", winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null } });
   return km!.externalId;
 }
@@ -129,7 +130,8 @@ describe("detectFromSync (cron)", () => {
     await t.mutation(internal.seed.seedFromSnapshot, {});
     const fm = await t.run((ctx) => ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "final")).first());
     await t.mutation(internal.matches.upsertMatchResult, {
-      match: { externalId: fm!.externalId, stage: "final", group: null, homeExternalId: "758", awayExternalId: "759",
+      tournamentCode: "WC",
+      match: { externalId: fm!.externalId, stage: "final", group: null, matchday: null, homeExternalId: "758", awayExternalId: "759",
         kickoffAt: fm!.kickoffAt, homeScore: 1, awayScore: 0, status: "finished", winnerExternalId: "758", bracketSlot: fm!.bracketSlot ?? null } });
     const a = await closedSolo(t, "A");
     await t.mutation(internal.notifications.detectFromSync, {});

@@ -19,8 +19,9 @@ async function closedSolo(t: T, name: string) {
 async function assignKnockout(t: T) {
   const km = await t.run((ctx) => ctx.db.query("matches").filter((q) => q.neq(q.field("stage"), "group")).first());
   await t.mutation(internal.matches.upsertMatchResult, {
+    tournamentCode: "WC",
     match: { externalId: km!.externalId, stage: km!.stage, group: null,
-      homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+      matchday: null, homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
       homeScore: null, awayScore: null, status: "scheduled", winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null },
   });
   return km!.externalId;
@@ -90,9 +91,10 @@ describe("overrides por quiniela", () => {
     const ext = fm!.externalId;
     // la API da la final ganada por 758
     await t.mutation(internal.matches.upsertMatchResult, {
-      match: { externalId: ext, stage: "final", group: null, homeExternalId: "758", awayExternalId: "759",
+      tournamentCode: "WC",
+      match: { externalId: ext, stage: "final", group: null, matchday: null, homeExternalId: "758", awayExternalId: "759",
         kickoffAt: fm!.kickoffAt, homeScore: 2, awayScore: 0, status: "finished", winnerExternalId: "758", bracketSlot: fm!.bracketSlot ?? null } });
-    await t.mutation(internal.matches.recomputeTeamStates, {});
+    await t.mutation(internal.matches.recomputeTeamStates, { tournamentCode: "WC" });
     const a = await closedSolo(t, "A"); const b = await closedSolo(t, "B");
 
     // A corrige la final: gana 759
@@ -120,10 +122,11 @@ describe("overrides por quiniela", () => {
     await t.mutation(internal.seed.seedFromSnapshot, {});
     const fm = await t.run((ctx) => ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "final")).first());
     await t.mutation(internal.matches.upsertMatchResult, {
-      match: { externalId: fm!.externalId, stage: "final", group: null, homeExternalId: "758", awayExternalId: "759",
+      tournamentCode: "WC",
+      match: { externalId: fm!.externalId, stage: "final", group: null, matchday: null, homeExternalId: "758", awayExternalId: "759",
         kickoffAt: fm!.kickoffAt, homeScore: 2, awayScore: 0, status: "finished", winnerExternalId: "758", bracketSlot: fm!.bracketSlot ?? null } });
     const a = await closedSolo(t, "A");
-    await t.mutation(internal.matches.recomputeTeamStates, {});
+    await t.mutation(internal.matches.recomputeTeamStates, { tournamentCode: "WC" });
     const qn = await t.run((ctx) => ctx.db.get(a.quinielaId));
     expect(qn!.championParticipantId ?? null).toBeNull(); // recompute no escribe el campeón
     expect(qn!.status).toBe("locked");                    // ni cambia el status a finished
@@ -141,9 +144,10 @@ describe("overrides por quiniela", () => {
     // cron: la API dice que ganó 759 (0-2) → el global recomputa
     const km = await t.run((ctx) => ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", ext)).first());
     await t.mutation(internal.matches.upsertMatchResult, {
-      match: { externalId: ext, stage: km!.stage, group: null, homeExternalId: "758", awayExternalId: "759",
+      tournamentCode: "WC",
+      match: { externalId: ext, stage: km!.stage, group: null, matchday: null, homeExternalId: "758", awayExternalId: "759",
         kickoffAt: km!.kickoffAt, homeScore: 0, awayScore: 2, status: "finished", winnerExternalId: "759", bracketSlot: km!.bracketSlot ?? null } });
-    await t.mutation(internal.matches.recomputeTeamStates, {});
+    await t.mutation(internal.matches.recomputeTeamStates, { tournamentCode: "WC" });
     const t758 = await teamByExt(t, "758"); const t759 = await teamByExt(t, "759");
     const persB = await t.query(api.participants.getPersonalPanel, { personalToken: await personalTokenOf(t, b.quinielaId) });
     const persA = await t.query(api.participants.getPersonalPanel, { personalToken: await personalTokenOf(t, a.quinielaId) });

@@ -16,9 +16,9 @@ export const syncMatches = internalAction({
     try {
       const matches = await fetchMatches(token, "WC");
       for (const match of matches) {
-        await ctx.runMutation(internal.matches.upsertMatchResult, { match });
+        await ctx.runMutation(internal.matches.upsertMatchResult, { tournamentCode: "WC", match });
       }
-      await ctx.runMutation(internal.matches.recomputeTeamStates, {});
+      await ctx.runMutation(internal.matches.recomputeTeamStates, { tournamentCode: "WC" });
       await ctx.runMutation(internal.quinielas.autoCloseDue, {});
       await ctx.runMutation(internal.notifications.detectFromSync, {});
       return { ok: true };

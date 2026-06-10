@@ -26,8 +26,9 @@ describe("seed + recompute", () => {
     const gm = await t.run((ctx) =>
       ctx.db.query("matches").withIndex("by_stage_kickoff", (q) => q.eq("stage", "group")).first());
     await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "WC",
       match: { externalId: gm!.externalId, stage: "group", group: gm!.group ?? null,
-        homeExternalId: null, awayExternalId: null, kickoffAt: gm!.kickoffAt,
+        matchday: null, homeExternalId: null, awayExternalId: null, kickoffAt: gm!.kickoffAt,
         homeScore: 2, awayScore: 0, status: "finished", bracketSlot: null },
     });
     const updated = await t.run((ctx) =>
@@ -49,19 +50,21 @@ describe("seed + recompute", () => {
     const externalId = km!.externalId;
     // two real seeded teams: 758 (Uruguay) home, 759 (Germany) away
     await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "WC",
       match: { externalId, stage: km!.stage, group: null,
-        homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+        matchday: null, homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
         homeScore: null, awayScore: null, status: "scheduled",
         winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null },
     });
     // finish it 1-1 but the away team wins on penalties (explicit winner)
     await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "WC",
       match: { externalId, stage: km!.stage, group: null,
-        homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+        matchday: null, homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
         homeScore: 1, awayScore: 1, status: "finished",
         winnerExternalId: "759", bracketSlot: km!.bracketSlot ?? null },
     });
-    await t.mutation(internal.matches.recomputeTeamStates, {});
+    await t.mutation(internal.matches.recomputeTeamStates, { tournamentCode: "WC" });
 
     const loser = await t.run((ctx) =>
       ctx.db.query("teams").withIndex("by_externalId", (q) => q.eq("externalId", "758")).first());
@@ -83,8 +86,9 @@ describe("seed + recompute", () => {
     const externalId = km!.externalId;
     // assign two real seeded teams so the match has resolvable home/away
     await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "WC",
       match: { externalId, stage: km!.stage, group: null,
-        homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
+        matchday: null, homeExternalId: "758", awayExternalId: "759", kickoffAt: km!.kickoffAt,
         homeScore: null, awayScore: null, status: "scheduled",
         winnerExternalId: null, bracketSlot: km!.bracketSlot ?? null },
     });
@@ -105,5 +109,55 @@ describe("seed + recompute", () => {
       ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", externalId)).first());
     expect(stored!.winnerTeamId ?? null).toBeNull();
     expect(stored!.status).toBe("scheduled");
+  });
+});
+
+describe("multi-torneo", () => {
+  it("upsertTeam crea el equipo en su torneo y es idempotente", async () => {
+    const t = convexTest(schema, modules);
+    const team = { externalId: "57", name: "Arsenal FC", code: "ARS", crest: "https://c/57.png" };
+    await t.mutation(internal.matches.upsertTeam, { team, tournamentCode: "PL", format: "liga" });
+    await t.mutation(internal.matches.upsertTeam, { team, tournamentCode: "PL", format: "liga" });
+    await t.run(async (ctx) => {
+      const rows = await ctx.db.query("teams").collect();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        tournamentCode: "PL", flag: "https://c/57.png", group: "", currentStage: "league", alive: true,
+      });
+    });
+  });
+
+  it("el mismo club en dos torneos produce dos filas", async () => {
+    const t = convexTest(schema, modules);
+    const team = { externalId: "86", name: "Real Madrid", code: "RMA", crest: "https://c/86.png" };
+    await t.mutation(internal.matches.upsertTeam, { team, tournamentCode: "PD", format: "liga" });
+    await t.mutation(internal.matches.upsertTeam, { team, tournamentCode: "CL", format: "eliminatorio" });
+    await t.run(async (ctx) => {
+      expect(await ctx.db.query("teams").collect()).toHaveLength(2);
+    });
+  });
+
+  it("upsertMatchResult resuelve equipos dentro del torneo y guarda matchday", async () => {
+    const t = convexTest(schema, modules);
+    for (const [code, ext] of [["PL", "57"], ["PL", "65"], ["PD", "57"]] as const) {
+      await t.mutation(internal.matches.upsertTeam, {
+        team: { externalId: ext, name: ext, code: ext, crest: "" }, tournamentCode: code, format: "liga",
+      });
+    }
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId: "m1", stage: "league", group: null, matchday: 24,
+        homeExternalId: "57", awayExternalId: "65", kickoffAt: 100,
+        homeScore: null, awayScore: null, status: "scheduled",
+        winnerExternalId: null, bracketSlot: null,
+      },
+    });
+    await t.run(async (ctx) => {
+      const [mt] = await ctx.db.query("matches").collect();
+      expect(mt).toMatchObject({ tournamentCode: "PL", matchday: 24 });
+      const home = await ctx.db.get(mt.homeTeamId!);
+      expect(home?.tournamentCode).toBe("PL"); // no el Real Madrid de PD
+    });
   });
 });

@@ -3,11 +3,13 @@ import { internalMutation, mutation, type MutationCtx } from "./_generated/serve
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { computeTeamStates, type MatchRow, type TeamRow } from "./lib/tournament";
+import { tournamentByCode } from "./lib/tournaments";
 
 const apiMatch = v.object({
   externalId: v.string(),
   stage: v.string(),
   group: v.union(v.string(), v.null()),
+  matchday: v.union(v.number(), v.null()),
   homeExternalId: v.union(v.string(), v.null()),
   awayExternalId: v.union(v.string(), v.null()),
   kickoffAt: v.number(),
@@ -18,10 +20,29 @@ const apiMatch = v.object({
   bracketSlot: v.union(v.string(), v.null()),
 });
 
-async function teamIdByExternal(ctx: MutationCtx, ext: string | null): Promise<Id<"teams"> | undefined> {
+// Busca el id del equipo dentro del torneo indicado.
+// Fallback legacy: filas WC pre-backfill no tienen tournamentCode aún; se aceptan
+// solo si tournamentCode === "WC" y la fila carece de tournamentCode.
+async function teamIdByExternal(
+  ctx: MutationCtx,
+  tournamentCode: string,
+  ext: string | null,
+): Promise<Id<"teams"> | undefined> {
   if (!ext) return undefined;
-  const t = await ctx.db.query("teams").withIndex("by_externalId", (q) => q.eq("externalId", ext)).first();
-  return t?._id;
+  const t = await ctx.db
+    .query("teams")
+    .withIndex("by_tournament_externalId", (q) =>
+      q.eq("tournamentCode", tournamentCode).eq("externalId", ext),
+    )
+    .first();
+  if (t) return t._id;
+  // Fallback legacy WC: filas pre-backfill no tienen tournamentCode
+  if (tournamentCode !== "WC") return undefined;
+  const legacy = await ctx.db
+    .query("teams")
+    .withIndex("by_externalId", (q) => q.eq("externalId", ext))
+    .first();
+  return legacy && legacy.tournamentCode === undefined ? legacy._id : undefined;
 }
 
 function winnerOf(
@@ -38,29 +59,84 @@ function winnerOf(
   return undefined;
 }
 
-export const upsertMatchResult = internalMutation({
-  args: { match: apiMatch },
-  handler: async (ctx, { match }) => {
+export const upsertTeam = internalMutation({
+  args: {
+    tournamentCode: v.string(),
+    format: v.union(v.literal("eliminatorio"), v.literal("liga")),
+    team: v.object({
+      externalId: v.string(),
+      name: v.string(),
+      code: v.string(),
+      crest: v.string(),
+    }),
+  },
+  returns: v.null(),
+  handler: async (ctx, { tournamentCode, format, team }) => {
     const existing = await ctx.db
-      .query("matches").withIndex("by_externalId", (q) => q.eq("externalId", match.externalId)).first();
-    // El partido global siempre sigue la API; las correcciones manuales viven por
-    // quiniela en matchOverrides, así que aquí ya no hay nada que respetar.
+      .query("teams")
+      .withIndex("by_tournament_externalId", (q) =>
+        q.eq("tournamentCode", tournamentCode).eq("externalId", team.externalId),
+      )
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { name: team.name, code: team.code, flag: team.crest });
+      return null;
+    }
+    await ctx.db.insert("teams", {
+      code: team.code,
+      name: team.name,
+      flag: team.crest,
+      group: "", // los eliminatorios reciben grupo desde sus partidos de grupos
+      alive: true,
+      currentStage: format === "liga" ? "league" : "group",
+      externalId: team.externalId,
+      tournamentCode,
+    });
+    return null;
+  },
+});
 
-    const homeTeamId = (await teamIdByExternal(ctx, match.homeExternalId)) ?? existing?.homeTeamId;
-    const awayTeamId = (await teamIdByExternal(ctx, match.awayExternalId)) ?? existing?.awayTeamId;
+export const upsertMatchResult = internalMutation({
+  args: { tournamentCode: v.string(), match: apiMatch },
+  returns: v.null(),
+  handler: async (ctx, { tournamentCode, match }) => {
+    // Buscar por torneo primero; fallback legacy para WC sin tournamentCode
+    let existing = await ctx.db
+      .query("matches")
+      .withIndex("by_tournament_externalId", (q) =>
+        q.eq("tournamentCode", tournamentCode).eq("externalId", match.externalId),
+      )
+      .first();
+    if (!existing && tournamentCode === "WC") {
+      const legacyCandidate = await ctx.db
+        .query("matches")
+        .withIndex("by_externalId", (q) => q.eq("externalId", match.externalId))
+        .first();
+      if (legacyCandidate && legacyCandidate.tournamentCode === undefined) {
+        existing = legacyCandidate;
+      }
+    }
+
+    const homeTeamId =
+      (await teamIdByExternal(ctx, tournamentCode, match.homeExternalId)) ?? existing?.homeTeamId;
+    const awayTeamId =
+      (await teamIdByExternal(ctx, tournamentCode, match.awayExternalId)) ?? existing?.awayTeamId;
     // Prefer the API's explicit winner (covers ET/penalties where scores are equal);
     // fall back to the score-derived winner only when no explicit winner is given.
     const winnerTeamId =
       match.status !== "finished"
         ? undefined
         : typeof match.winnerExternalId === "string"
-          ? await teamIdByExternal(ctx, match.winnerExternalId)
+          ? await teamIdByExternal(ctx, tournamentCode, match.winnerExternalId)
           : winnerOf(homeTeamId, awayTeamId, match.homeScore, match.awayScore);
 
     const fields = {
       stage: match.stage,
       group: match.group ?? undefined,
-      homeTeamId, awayTeamId,
+      matchday: match.matchday ?? undefined, // null is not storable; schema uses v.optional(v.number())
+      tournamentCode,
+      homeTeamId,
+      awayTeamId,
       kickoffAt: match.kickoffAt,
       homeScore: match.homeScore ?? undefined,
       awayScore: match.awayScore ?? undefined,
@@ -71,21 +147,74 @@ export const upsertMatchResult = internalMutation({
     };
     if (existing) await ctx.db.patch(existing._id, fields);
     else await ctx.db.insert("matches", fields);
+
+    // Si el partido tiene grupo y algún equipo aún no tiene grupo asignado, asignárselo
+    if (match.group) {
+      for (const tid of [homeTeamId, awayTeamId]) {
+        if (!tid) continue;
+        const tm = await ctx.db.get(tid);
+        if (tm && tm.group === "") await ctx.db.patch(tid, { group: match.group });
+      }
+    }
+    return null;
   },
 });
 
 export const recomputeTeamStates = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const teams = await ctx.db.query("teams").collect();
-    const matches = await ctx.db.query("matches").collect();
+  args: { tournamentCode: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Solo aplica a torneos eliminatorios
+    if (tournamentByCode(args.tournamentCode)?.format !== "eliminatorio") return null;
+
+    // Cargar equipos del torneo (incluyendo legacy WC sin tournamentCode)
+    const scopedTeams = await ctx.db
+      .query("teams")
+      .withIndex("by_tournament", (q) => q.eq("tournamentCode", args.tournamentCode))
+      .collect();
+
+    const teams =
+      args.tournamentCode === "WC"
+        ? [
+            ...scopedTeams,
+            // Fallback: filas WC pre-backfill no tienen tournamentCode
+            ...(await ctx.db.query("teams").collect()).filter(
+              (t) => t.tournamentCode === undefined,
+            ),
+          ]
+        : scopedTeams;
+
+    // Cargar partidos del torneo (incluyendo legacy WC sin tournamentCode)
+    const scopedMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_tournament_kickoff", (q) =>
+        q.eq("tournamentCode", args.tournamentCode),
+      )
+      .collect();
+
+    const matches =
+      args.tournamentCode === "WC"
+        ? [
+            ...scopedMatches,
+            ...(await ctx.db.query("matches").collect()).filter(
+              (mt) => mt.tournamentCode === undefined,
+            ),
+          ]
+        : scopedMatches;
+
     const states = computeTeamStates(
       teams.map((t) => ({ _id: t._id, group: t.group })) as TeamRow[],
       matches.map((mt) => ({
-        _id: mt._id, stage: mt.stage, group: mt.group,
-        homeTeamId: mt.homeTeamId ?? null, awayTeamId: mt.awayTeamId ?? null,
-        homeScore: mt.homeScore ?? null, awayScore: mt.awayScore ?? null,
-        status: mt.status, winnerTeamId: mt.winnerTeamId ?? null, kickoffAt: mt.kickoffAt,
+        _id: mt._id,
+        stage: mt.stage,
+        group: mt.group,
+        homeTeamId: mt.homeTeamId ?? null,
+        awayTeamId: mt.awayTeamId ?? null,
+        homeScore: mt.homeScore ?? null,
+        awayScore: mt.awayScore ?? null,
+        status: mt.status,
+        winnerTeamId: mt.winnerTeamId ?? null,
+        kickoffAt: mt.kickoffAt,
       })) as MatchRow[],
     );
     // Baseline de la API: el estado global de equipos = lo que ve una quiniela SIN
@@ -95,9 +224,14 @@ export const recomputeTeamStates = internalMutation({
     for (const t of teams) {
       const s = states.get(t._id)!;
       if (t.alive !== s.alive || t.currentStage !== s.currentStage) {
-        await ctx.db.patch(t._id, { alive: s.alive, currentStage: s.currentStage, eliminatedAt: s.eliminatedAt });
+        await ctx.db.patch(t._id, {
+          alive: s.alive,
+          currentStage: s.currentStage,
+          eliminatedAt: s.eliminatedAt,
+        });
       }
     }
+    return null;
   },
 });
 
@@ -105,28 +239,53 @@ export const recomputeTeamStates = internalMutation({
 // matchOverrides). El partido global nunca se toca; cada quiniela ve la verdad de
 // la API con sus propias correcciones encima (derivado en lectura por resolveQuiniela).
 export const setMatchResultManual = mutation({
-  args: { adminToken: v.string(), matchExternalId: v.string(),
-          homeScore: v.number(), awayScore: v.number(), finished: v.boolean(),
-          winnerExternalId: v.optional(v.union(v.string(), v.null())) },
+  args: {
+    adminToken: v.string(),
+    matchExternalId: v.string(),
+    homeScore: v.number(),
+    awayScore: v.number(),
+    finished: v.boolean(),
+    winnerExternalId: v.optional(v.union(v.string(), v.null())),
+  },
+  returns: v.object({ ok: v.literal(true) }),
   handler: async (ctx, args) => {
-    const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    const qn = await ctx.db
+      .query("quinielas")
+      .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken))
+      .first();
     if (!qn) throw new Error("Quiniela no encontrada");
-    const match = await ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId)).first();
+    const match = await ctx.db
+      .query("matches")
+      .withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId))
+      .first();
     if (!match) throw new Error("Partido no encontrado");
+    // Usar el tournamentCode de la quiniela para resolver al ganador (fallback a "WC")
+    const tCode = qn.tournamentCode ?? "WC";
     // An explicit winner lets an admin resolve a tied knockout (penalties / extra time);
     // otherwise fall back to the score (home>away→home, away>home→away, tie→none).
-    const winnerTeamId = !args.finished ? undefined
-      : typeof args.winnerExternalId === "string" ? await teamIdByExternal(ctx, args.winnerExternalId)
-      : args.homeScore > args.awayScore ? match.homeTeamId
-      : args.awayScore > args.homeScore ? match.awayTeamId : undefined;
+    const winnerTeamId = !args.finished
+      ? undefined
+      : typeof args.winnerExternalId === "string"
+        ? await teamIdByExternal(ctx, tCode, args.winnerExternalId)
+        : args.homeScore > args.awayScore
+          ? match.homeTeamId
+          : args.awayScore > args.homeScore
+            ? match.awayTeamId
+            : undefined;
     const fields = {
-      quinielaId: qn._id, matchId: match._id,
-      homeScore: args.homeScore, awayScore: args.awayScore,
+      quinielaId: qn._id,
+      matchId: match._id,
+      homeScore: args.homeScore,
+      awayScore: args.awayScore,
       status: args.finished ? "finished" : "live",
       winnerTeamId,
     };
-    const existing = await ctx.db.query("matchOverrides")
-      .withIndex("by_quiniela_match", (q) => q.eq("quinielaId", qn._id).eq("matchId", match._id)).first();
+    const existing = await ctx.db
+      .query("matchOverrides")
+      .withIndex("by_quiniela_match", (q) =>
+        q.eq("quinielaId", qn._id).eq("matchId", match._id),
+      )
+      .first();
     if (existing) await ctx.db.patch(existing._id, fields);
     else await ctx.db.insert("matchOverrides", fields);
     return { ok: true as const };
@@ -137,13 +296,24 @@ export const setMatchResultManual = mutation({
 // SOLO en esa quiniela. Idempotente si no había override.
 export const clearMatchOverride = mutation({
   args: { adminToken: v.string(), matchExternalId: v.string() },
+  returns: v.object({ ok: v.literal(true) }),
   handler: async (ctx, args) => {
-    const qn = await ctx.db.query("quinielas").withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken)).first();
+    const qn = await ctx.db
+      .query("quinielas")
+      .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken))
+      .first();
     if (!qn) throw new Error("Quiniela no encontrada");
-    const match = await ctx.db.query("matches").withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId)).first();
+    const match = await ctx.db
+      .query("matches")
+      .withIndex("by_externalId", (q) => q.eq("externalId", args.matchExternalId))
+      .first();
     if (!match) throw new Error("Partido no encontrado");
-    const existing = await ctx.db.query("matchOverrides")
-      .withIndex("by_quiniela_match", (q) => q.eq("quinielaId", qn._id).eq("matchId", match._id)).first();
+    const existing = await ctx.db
+      .query("matchOverrides")
+      .withIndex("by_quiniela_match", (q) =>
+        q.eq("quinielaId", qn._id).eq("matchId", match._id),
+      )
+      .first();
     if (existing) await ctx.db.delete(existing._id);
     return { ok: true as const };
   },
