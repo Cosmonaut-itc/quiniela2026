@@ -7,6 +7,7 @@ import { resolveQuiniela } from "./lib/perQuiniela";
 import { detectSyncEvents, type NotifyIntent } from "./lib/notify";
 import { detectProgolEvents } from "./lib/progol";
 import { gameModeOf } from "./lib/view";
+import { tournamentCodeOf } from "./lib/tournaments";
 
 const SOON_MS = 65 * 60_000;
 
@@ -127,23 +128,46 @@ export const markRead = mutation({
 });
 
 /** Recorre las quinielas, deriva su estado efectivo (con overrides) e inserta los avisos
- *  por sincronización que falten. Se llama al final de syncMatches. */
+ *  por sincronización que falten. Se llama al final de syncMatches.
+ *
+ *  INVARIANTE DE TORNEO: cada quiniela solo "ve" los partidos de su propio torneo.
+ *  `resolveQuiniela` carga TODOS los partidos (por diseño — soporta overrides globales),
+ *  pero aquí filtramos `effRows` a los que pertenecen al torneo de la quiniela ANTES de
+ *  pasarlos a los detectores. Esto evita que partidos de otro torneo generen avisos y
+ *  previene la explosión del scheduler (>1000 ctx.scheduler.runAfter en una mutación). */
 export const detectFromSync = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const firstMatch = await ctx.db.query("matches").withIndex("by_kickoff").first();
     const now = Date.now();
-    const tournamentStarted = !!firstMatch && now >= firstMatch.kickoffAt;
     const quinielas = await ctx.db.query("quinielas").collect();
     for (const qn of quinielas) {
+      const qnCode = tournamentCodeOf(qn);
+      const { matches, effRows } = await resolveQuiniela(ctx, qn._id);
+
+      // Construir el subconjunto de effRows que pertenece al torneo de esta quiniela.
+      // `matches` son los Doc<"matches"> completos (tienen tournamentCode?); `effRows`
+      // comparten los mismos _id pero no llevan tournamentCode. Unimos por _id.
+      const inTournament = new Set(
+        matches
+          .filter((m) => tournamentCodeOf(m) === qnCode)
+          .map((m) => m._id as string),
+      );
+      const scopedRows = effRows.filter((m) => inTournament.has(m._id));
+
+      // tournamentStarted es POR TORNEO: el primero de sus partidos ya arrancó.
+      const scopedMatches = matches.filter((m) => inTournament.has(m._id as string));
+      const firstKickoff = scopedMatches.length > 0
+        ? Math.min(...scopedMatches.map((m) => m.kickoffAt))
+        : Infinity;
+      const tournamentStarted = now >= firstKickoff;
+
       if (gameModeOf(qn) === "progol") {
         const participants = await ctx.db.query("participants")
           .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
         if (participants.length === 0) continue;
-        const { effRows } = await resolveQuiniela(ctx, qn._id);
         const intents = detectProgolEvents({
           quinielaId: qn._id as string, tournamentStarted,
-          effMatches: effRows.map((m) => ({ stage: m.stage, homeTeamId: m.homeTeamId, awayTeamId: m.awayTeamId })),
+          effMatches: scopedRows.map((m) => ({ stage: m.stage, homeTeamId: m.homeTeamId, awayTeamId: m.awayTeamId })),
           participants: participants.map((p) => ({ id: p._id as string })),
         });
         for (const intent of intents) await insertNotification(ctx, intent);
@@ -152,7 +176,7 @@ export const detectFromSync = internalMutation({
       const ownerships = await ctx.db.query("ownerships")
         .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       if (ownerships.length === 0) continue; // sin equipos repartidos no hay nada que avisar
-      const { teamById, effRows, states } = await resolveQuiniela(ctx, qn._id);
+      const { teamById, states } = await resolveQuiniela(ctx, qn._id);
       const participants = await ctx.db.query("participants")
         .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       const teamLiteById = new Map(
@@ -169,7 +193,7 @@ export const detectFromSync = internalMutation({
       }));
       const intents = detectSyncEvents({
         quinielaId: qn._id as string, now, soonMs: SOON_MS, tournamentStarted,
-        teamById: teamLiteById, effMatches: effRows, states, ownerByTeam, participants: pInput,
+        teamById: teamLiteById, effMatches: scopedRows, states, ownerByTeam, participants: pInput,
       });
       for (const intent of intents) await insertNotification(ctx, intent);
     }

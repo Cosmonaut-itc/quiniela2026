@@ -194,6 +194,105 @@ describe("eventos por acción", () => {
   });
 });
 
+describe("aislamiento por torneo", () => {
+  it("partidos de otro torneo no generan avisos", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    // Crear quiniela WC con un participante
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "WC-test", prizeText: "$1", numParticipants: 1 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    // Contar notificaciones actuales del participante
+    const personalToken = await tokenOf(t, q.quinielaId);
+    const before = await t.query(api.notifications.listForParticipant, { personalToken });
+    const countBefore = before.items.length;
+    // Sembrar dos equipos de PL
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL",
+      format: "liga",
+      team: { externalId: "PL-T1", name: "Arsenal", code: "ARS", crest: "🔴" },
+    });
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL",
+      format: "liga",
+      team: { externalId: "PL-T2", name: "Chelsea", code: "CHE", crest: "🔵" },
+    });
+    // Sembrar un partido de PL terminado
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId: "PL-M1",
+        stage: "league",
+        group: null,
+        matchday: 1,
+        homeExternalId: "PL-T1",
+        awayExternalId: "PL-T2",
+        kickoffAt: Date.now() - 2 * 60 * 60_000,
+        homeScore: 2,
+        awayScore: 1,
+        status: "finished",
+        winnerExternalId: "PL-T1",
+        bracketSlot: null,
+      },
+    });
+    // Correr detectFromSync — no debe agregar ningún aviso de PL a la quiniela WC
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const after = await t.query(api.notifications.listForParticipant, { personalToken });
+    expect(after.items.length).toBe(countBefore);
+  });
+
+  it("tournamentStarted es por torneo: PL pasado no dispara tournament_started en WC", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.seedFromSnapshot, {});
+    // Crear quiniela WC con un participante y cerrarla
+    const q = await t.mutation(api.quinielas.createQuiniela, { name: "WC-ts", prizeText: "$1", numParticipants: 1 });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Bob" });
+    await t.mutation(api.quinielas.closeAndRedistribute, { adminToken: q.adminToken });
+    // Asegurar que todos los partidos WC estén en el FUTURO
+    const wcMatches = await t.run((ctx) =>
+      ctx.db.query("matches").collect().then((ms) =>
+        ms.filter((m) => (m.tournamentCode ?? "WC") === "WC")
+      )
+    );
+    const futureKickoff = Date.now() + 30 * 24 * 60 * 60_000; // 30 días en el futuro
+    for (const m of wcMatches) {
+      await t.run((ctx) => ctx.db.patch(m._id, { kickoffAt: futureKickoff }));
+    }
+    // Sembrar dos equipos de PL y un partido de PL en el PASADO
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL",
+      format: "liga",
+      team: { externalId: "PL-TS1", name: "Liverpool", code: "LIV", crest: "🔴" },
+    });
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "PL",
+      format: "liga",
+      team: { externalId: "PL-TS2", name: "ManCity", code: "MCI", crest: "🔵" },
+    });
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "PL",
+      match: {
+        externalId: "PL-TS-M1",
+        stage: "league",
+        group: null,
+        matchday: 1,
+        homeExternalId: "PL-TS1",
+        awayExternalId: "PL-TS2",
+        kickoffAt: Date.now() - 60_000, // en el pasado
+        homeScore: 1,
+        awayScore: 0,
+        status: "finished",
+        winnerExternalId: "PL-TS1",
+        bracketSlot: null,
+      },
+    });
+    await t.mutation(internal.notifications.detectFromSync, {});
+    const personalToken = await tokenOf(t, q.quinielaId);
+    const list = await t.query(api.notifications.listForParticipant, { personalToken });
+    // El torneo WC no ha empezado (todos sus partidos son futuros), así que NO debe emitirse tournament_started
+    expect(list.items.some((n) => n.type === "tournament_started")).toBe(false);
+  });
+});
+
 describe("suscripciones push", () => {
   it("guarda (upsert por endpoint) y borra una suscripción del jugador", async () => {
     const t = convexTest(schema, modules);
