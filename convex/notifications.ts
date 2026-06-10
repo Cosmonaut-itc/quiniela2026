@@ -142,29 +142,25 @@ export const detectFromSync = internalMutation({
     const quinielas = await ctx.db.query("quinielas").collect();
     for (const qn of quinielas) {
       const qnCode = tournamentCodeOf(qn);
-      const { matches, effRows } = await resolveQuiniela(ctx, qn._id);
-
-      // Construir el subconjunto de effRows que pertenece al torneo de esta quiniela.
-      // `matches` son los Doc<"matches"> completos (tienen tournamentCode?); `effRows`
-      // comparten los mismos _id pero no llevan tournamentCode. Unimos por _id.
-      const inTournament = new Set(
-        matches
-          .filter((m) => tournamentCodeOf(m) === qnCode)
-          .map((m) => m._id as string),
-      );
-      const scopedRows = effRows.filter((m) => inTournament.has(m._id));
-
-      // tournamentStarted es POR TORNEO: el primero de sus partidos ya arrancó.
-      const scopedMatches = matches.filter((m) => inTournament.has(m._id as string));
-      const firstKickoff = scopedMatches.length > 0
-        ? Math.min(...scopedMatches.map((m) => m.kickoffAt))
-        : Infinity;
-      const tournamentStarted = now >= firstKickoff;
 
       if (gameModeOf(qn) === "progol") {
+        // Cheap guard: sin participantes no hay nada que avisar.
         const participants = await ctx.db.query("participants")
           .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
         if (participants.length === 0) continue;
+
+        // Una sola resolución por quiniela.
+        const { matches, effRows } = await resolveQuiniela(ctx, qn._id);
+        const inTournament = new Set(
+          matches.filter((m) => tournamentCodeOf(m) === qnCode).map((m) => m._id as string),
+        );
+        const scopedRows = effRows.filter((m) => inTournament.has(m._id));
+        const scopedMatches = matches.filter((m) => inTournament.has(m._id as string));
+        const firstKickoff = scopedMatches.length > 0
+          ? Math.min(...scopedMatches.map((m) => m.kickoffAt))
+          : Infinity;
+        const tournamentStarted = now >= firstKickoff;
+
         const intents = detectProgolEvents({
           quinielaId: qn._id as string, tournamentStarted,
           effMatches: scopedRows.map((m) => ({ stage: m.stage, homeTeamId: m.homeTeamId, awayTeamId: m.awayTeamId })),
@@ -173,10 +169,24 @@ export const detectFromSync = internalMutation({
         for (const intent of intents) await insertNotification(ctx, intent);
         continue;
       }
+
+      // Clásica: cheap guard: sin ownerships no hay nada que avisar.
       const ownerships = await ctx.db.query("ownerships")
         .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
-      if (ownerships.length === 0) continue; // sin equipos repartidos no hay nada que avisar
-      const { teamById, states } = await resolveQuiniela(ctx, qn._id);
+      if (ownerships.length === 0) continue;
+
+      // Una sola resolución por quiniela.
+      const { matches, effRows, teamById, states } = await resolveQuiniela(ctx, qn._id);
+      const inTournament = new Set(
+        matches.filter((m) => tournamentCodeOf(m) === qnCode).map((m) => m._id as string),
+      );
+      const scopedRows = effRows.filter((m) => inTournament.has(m._id));
+      const scopedMatches = matches.filter((m) => inTournament.has(m._id as string));
+      const firstKickoff = scopedMatches.length > 0
+        ? Math.min(...scopedMatches.map((m) => m.kickoffAt))
+        : Infinity;
+      const tournamentStarted = now >= firstKickoff;
+
       const participants = await ctx.db.query("participants")
         .withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       const teamLiteById = new Map(

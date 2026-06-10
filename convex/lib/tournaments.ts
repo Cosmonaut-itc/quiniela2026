@@ -4,7 +4,6 @@
 import type { GameMode } from "../types";
 
 export type TournamentFormat = "eliminatorio" | "liga";
-export type { GameMode };
 
 export type Tournament = {
   code: string;        // código football-data (path de la API)

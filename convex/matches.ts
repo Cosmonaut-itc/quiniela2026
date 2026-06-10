@@ -190,7 +190,7 @@ export const recomputeTeamStates = internalMutation({
       .withIndex("by_tournament", (q) => q.eq("tournamentCode", args.tournamentCode))
       .collect();
 
-    // TODO: eliminar el concat legacy una vez que backfillTournamentCode esté verificado en producción
+    // TODO: eliminar el concat legacy una vez que backfillTournamentCode esté verificado en producción (SEN-16)
     const teams =
       args.tournamentCode === "WC"
         ? [
