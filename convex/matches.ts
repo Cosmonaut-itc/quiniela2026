@@ -3,7 +3,7 @@ import { internalMutation, mutation, type MutationCtx } from "./_generated/serve
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { computeTeamStates, type MatchRow, type TeamRow } from "./lib/tournament";
-import { tournamentByCode } from "./lib/tournaments";
+import { tournamentByCode, tournamentCodeOf } from "./lib/tournaments";
 
 const apiMatch = v.object({
   externalId: v.string(),
@@ -41,8 +41,9 @@ async function teamIdByExternal(
   const legacy = await ctx.db
     .query("teams")
     .withIndex("by_externalId", (q) => q.eq("externalId", ext))
+    .filter((q) => q.eq(q.field("tournamentCode"), undefined))
     .first();
-  return legacy && legacy.tournamentCode === undefined ? legacy._id : undefined;
+  return legacy?._id;
 }
 
 function winnerOf(
@@ -82,6 +83,24 @@ export const upsertTeam = internalMutation({
       await ctx.db.patch(existing._id, { name: team.name, code: team.code, flag: team.crest });
       return null;
     }
+    // Fallback legacy: filas WC pre-backfill no tienen tournamentCode; las parchamos en lugar
+    // de insertar un duplicado (48 selecciones nacionales compartirían externalId con EC/WC).
+    if (tournamentCode === "WC") {
+      const legacy = await ctx.db
+        .query("teams")
+        .withIndex("by_externalId", (q) => q.eq("externalId", team.externalId))
+        .filter((q) => q.eq(q.field("tournamentCode"), undefined))
+        .first();
+      if (legacy) {
+        await ctx.db.patch(legacy._id, {
+          name: team.name,
+          code: team.code,
+          flag: team.crest,
+          tournamentCode,
+        });
+        return null;
+      }
+    }
     await ctx.db.insert("teams", {
       code: team.code,
       name: team.name,
@@ -108,13 +127,11 @@ export const upsertMatchResult = internalMutation({
       )
       .first();
     if (!existing && tournamentCode === "WC") {
-      const legacyCandidate = await ctx.db
+      existing = await ctx.db
         .query("matches")
         .withIndex("by_externalId", (q) => q.eq("externalId", match.externalId))
+        .filter((q) => q.eq(q.field("tournamentCode"), undefined))
         .first();
-      if (legacyCandidate && legacyCandidate.tournamentCode === undefined) {
-        existing = legacyCandidate;
-      }
     }
 
     const homeTeamId =
@@ -173,6 +190,7 @@ export const recomputeTeamStates = internalMutation({
       .withIndex("by_tournament", (q) => q.eq("tournamentCode", args.tournamentCode))
       .collect();
 
+    // TODO: eliminar el concat legacy una vez que backfillTournamentCode esté verificado en producción
     const teams =
       args.tournamentCode === "WC"
         ? [
@@ -260,7 +278,7 @@ export const setMatchResultManual = mutation({
       .first();
     if (!match) throw new Error("Partido no encontrado");
     // Usar el tournamentCode de la quiniela para resolver al ganador (fallback a "WC")
-    const tCode = qn.tournamentCode ?? "WC";
+    const tCode = tournamentCodeOf(qn);
     // An explicit winner lets an admin resolve a tied knockout (penalties / extra time);
     // otherwise fall back to the score (home>away→home, away>home→away, tie→none).
     const winnerTeamId = !args.finished

@@ -112,6 +112,74 @@ describe("seed + recompute", () => {
   });
 });
 
+describe("fallback legacy WC", () => {
+  it("upsertMatchResult sobre fila legacy patchea y estampa WC sin duplicar", async () => {
+    const t = convexTest(schema, modules);
+
+    // Sembrar un par de equipos y un partido legacy (sin tournamentCode), igual que seed.ts
+    await t.run(async (ctx) => {
+      const homeId = await ctx.db.insert("teams", {
+        externalId: "901", name: "Sel A", code: "AAA", flag: "", group: "A",
+        alive: true, currentStage: "group",
+      });
+      const awayId = await ctx.db.insert("teams", {
+        externalId: "902", name: "Sel B", code: "BBB", flag: "", group: "A",
+        alive: true, currentStage: "group",
+      });
+      await ctx.db.insert("matches", {
+        externalId: "legacyM1", stage: "group", group: "A",
+        homeTeamId: homeId, awayTeamId: awayId,
+        kickoffAt: 1000, status: "scheduled",
+      });
+    });
+
+    // Llamar con tournamentCode "WC" — debe parchear la fila legacy, no insertar otra
+    await t.mutation(internal.matches.upsertMatchResult, {
+      tournamentCode: "WC",
+      match: {
+        externalId: "legacyM1", stage: "group", group: "A", matchday: null,
+        homeExternalId: null, awayExternalId: null, kickoffAt: 1000,
+        homeScore: 3, awayScore: 1, status: "finished",
+        winnerExternalId: null, bracketSlot: null,
+      },
+    });
+
+    await t.run(async (ctx) => {
+      const rows = await ctx.db.query("matches").collect();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].tournamentCode).toBe("WC");
+      expect(rows[0].homeScore).toBe(3);
+    });
+  });
+
+  it("upsertTeam sobre fila legacy patchea y estampa WC sin duplicar", async () => {
+    const t = convexTest(schema, modules);
+
+    // Sembrar equipo legacy sin tournamentCode, igual que seed.ts
+    await t.run(async (ctx) => {
+      await ctx.db.insert("teams", {
+        externalId: "758", name: "Uruguay (legacy)", code: "URU", flag: "old-flag.png",
+        group: "C", alive: true, currentStage: "group",
+      });
+    });
+
+    // Llamar upsertTeam con tournamentCode "WC" y datos actualizados
+    await t.mutation(internal.matches.upsertTeam, {
+      tournamentCode: "WC",
+      format: "eliminatorio",
+      team: { externalId: "758", name: "Uruguay", code: "URU", crest: "new-flag.png" },
+    });
+
+    await t.run(async (ctx) => {
+      const rows = await ctx.db.query("teams").collect();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].tournamentCode).toBe("WC");
+      expect(rows[0].name).toBe("Uruguay");
+      expect(rows[0].flag).toBe("new-flag.png");
+    });
+  });
+});
+
 describe("multi-torneo", () => {
   it("upsertTeam crea el equipo en su torneo y es idempotente", async () => {
     const t = convexTest(schema, modules);
