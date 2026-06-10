@@ -42,15 +42,41 @@ export const syncTournament = internalAction({
   },
 });
 
-/** Delegación delgada al cron de 5 min: sincroniza el Mundial (WC).
- *  Antes del refactor, el cuerpo estaba aquí directamente; ahora delega a
- *  syncTournament para reusar la lógica con cualquier torneo del catálogo.
- *  Pasos preservados: fetchMatches → upsertMatchResult × N →
- *  recomputeTeamStates → autoCloseDue → detectFromSync → { ok, error? }. */
+// Free tier: 10 llamadas/min. Entre torneos esperamos 6.5s para nunca rebasarlo
+// aunque el ciclo sincronice los 12 del catálogo.
+export const SPACING_MS = 6_500;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Cuerpo puro del ciclo (deps inyectadas para testear sin dormir de verdad):
+ *  recorre los torneos secuencialmente con pausa ENTRE llamadas — nunca antes
+ *  de la primera. Un fallo se registra (logs de Convex) y no aborta el resto;
+ *  syncTournament atrapa sus propios errores, así que syncOne nunca lanza. */
+export async function runSyncCycle(
+  codes: string[],
+  syncOne: (code: string) => Promise<{ ok: boolean; error?: string }>,
+  pause: (ms: number) => Promise<void>,
+): Promise<string[]> {
+  const synced: string[] = [];
+  for (const [i, code] of codes.entries()) {
+    if (i > 0) await pause(SPACING_MS);
+    const res = await syncOne(code);
+    if (res.ok) synced.push(code);
+    else console.error(`sync de ${code} falló: ${res.error}`);
+  }
+  return synced;
+}
+
+/** Entrada del cron: recorre los torneos con quinielas vivas, espaciado. */
 export const syncMatches = internalAction({
   args: {},
-  returns: v.object({ ok: v.boolean(), error: v.optional(v.string()) }),
-  handler: async (ctx): Promise<{ ok: boolean; error?: string }> => {
-    return await ctx.runAction(internal.sync.syncTournament, { code: "WC" });
+  returns: v.object({ ok: v.boolean(), synced: v.array(v.string()) }),
+  handler: async (ctx): Promise<{ ok: boolean; synced: string[] }> => {
+    const codes = await ctx.runQuery(internal.tournaments.activeTournamentCodes, {});
+    const synced = await runSyncCycle(
+      codes,
+      (code) => ctx.runAction(internal.sync.syncTournament, { code }),
+      sleep,
+    );
+    return { ok: true, synced };
   },
 });
