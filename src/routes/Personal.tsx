@@ -4,7 +4,7 @@ import { ProgolPersonal } from "@/routes/progol/ProgolPersonal";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/../convex/_generated/api";
 import { EditableAvatar } from "@/components/EditableAvatar";
-import { TeamCard } from "@/components/TeamCard";
+import { TeamCard, TeamFlag } from "@/components/TeamCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PushOptIn } from "@/components/PushOptIn";
@@ -63,6 +63,7 @@ export default function Personal() {
           active="me"
           meToken={token}
           joinToken={data.joinToken}
+          tournament={mode.tournament}
         />
       }
     >
@@ -131,9 +132,7 @@ export default function Personal() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
-                        <span className="text-2xl leading-none">
-                          {g.myTeam.flag}
-                        </span>
+                        <TeamFlag flag={g.myTeam.flag} name={g.myTeam.name} className="text-2xl leading-none" />
                         <span className="font-heading font-bold">
                           Tu {g.myTeam.name}
                         </span>
@@ -150,9 +149,7 @@ export default function Personal() {
                       )}
                     </div>
                     <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="text-lg leading-none">
-                        {g.opponent.flag}
-                      </span>
+                      <TeamFlag flag={g.opponent.flag} name={g.opponent.name} className="text-lg leading-none" />
                       <span>
                         {g.opponent.name} — de{" "}
                         <span className="font-semibold text-foreground/80">

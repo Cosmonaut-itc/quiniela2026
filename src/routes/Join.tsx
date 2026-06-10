@@ -97,7 +97,7 @@ export default function Join() {
   return (
     <Shell
       bottomNav={
-        <BottomNav id={id!} active="general" joinToken={token} />
+        <BottomNav id={id!} active="general" joinToken={token} tournament={mode?.tournament} />
       }
     >
       {/* Header */}

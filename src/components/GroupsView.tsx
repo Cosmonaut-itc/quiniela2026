@@ -1,4 +1,5 @@
 import type { MundialData } from "@/../convex/types";
+import { TeamFlag } from "@/components/TeamCard";
 import { Avatar } from "@/components/Avatar";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +53,7 @@ export function GroupsView({
                           : "bg-muted-foreground/40",
                     )}
                   />
-                  <span className="text-lg leading-none">{r.team.flag}</span>
+                  <TeamFlag flag={r.team.flag} name={r.team.name} className="text-lg leading-none" />
                   <span
                     className={cn(
                       "truncate text-sm font-medium",

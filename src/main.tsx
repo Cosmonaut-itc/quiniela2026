@@ -23,6 +23,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/q/:id/me/:token" element={<Personal />} />
           <Route path="/q/:id/admin/:token" element={<Admin />} />
           <Route path="/q/:id/mundial" element={<Mundial />} />
+          <Route path="/q/:id/torneo" element={<Mundial />} />
         </Routes>
       </BrowserRouter>
       <Toaster />

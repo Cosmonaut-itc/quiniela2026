@@ -4,6 +4,16 @@ import { whenLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
+ * Identidad visual de un equipo: bandera emoji (selecciones) o escudo por URL
+ * (clubes); decide por prefijo http. Único punto de render de `team.flag`.
+ */
+export function TeamFlag({ flag, name, className = "" }: { flag: string; name: string; className?: string }) {
+  if (flag.startsWith("http"))
+    return <img src={flag} alt={name} className={cn("inline-block size-5 shrink-0 object-contain", className)} />;
+  return <span className={className}>{flag}</span>;
+}
+
+/**
  * A single team owned by the player: flag, name, group, and its alive/out
  * state, plus next-match and last-result lines. Eliminated teams are dimmed
  * and struck through.
@@ -19,7 +29,7 @@ export function TeamCard({ t }: { t: PersonalData["teams"][number] }) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="text-2xl leading-none">{t.team.flag}</span>
+          <TeamFlag flag={t.team.flag} name={t.team.name} className="text-2xl leading-none" />
           <div className="min-w-0">
             <div
               className={cn(
@@ -49,7 +59,7 @@ export function TeamCard({ t }: { t: PersonalData["teams"][number] }) {
       {t.nextMatch && (
         <p className="mt-2.5 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground/70">Próximo:</span> vs{" "}
-          {t.nextMatch.opponent.flag} {t.nextMatch.opponent.name} ·{" "}
+          <TeamFlag flag={t.nextMatch.opponent.flag} name={t.nextMatch.opponent.name} /> {t.nextMatch.opponent.name} ·{" "}
           {whenLabel(t.nextMatch.kickoffAt)} ·{" "}
           <span className="text-foreground/70">de {t.nextMatch.opponentOwner}</span>
         </p>

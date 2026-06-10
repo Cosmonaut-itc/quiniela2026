@@ -26,6 +26,7 @@ function LoadingState() {
 
 export function ProgolPersonal({ id, personalToken }: { id: string; personalToken: string }) {
   const data = useQuery(api.progol.getPersonal, { personalToken });
+  const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
   const predict = useMutation(api.progol.predict);
 
   if (data === undefined) return <LoadingState />;
@@ -40,7 +41,7 @@ export function ProgolPersonal({ id, personalToken }: { id: string; personalToke
   }
 
   return (
-    <Shell bottomNav={<BottomNav id={id} active="me" meToken={personalToken} joinToken={data.joinToken} />}>
+    <Shell bottomNav={<BottomNav id={id} active="me" meToken={personalToken} joinToken={data.joinToken} tournament={mode?.tournament} />}>
       <header className="grain bg-pitch header-safe relative -mx-4 overflow-hidden rounded-b-3xl border-b border-border px-4 pb-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">

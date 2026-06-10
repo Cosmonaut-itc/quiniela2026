@@ -55,11 +55,14 @@ export function BottomNav({
   active,
   meToken,
   joinToken,
+  tournament,
 }: {
   id: string;
   active: NavKey;
   meToken?: string | null;
   joinToken?: string | null;
+  // Torneo de la quiniela (getMode/getTorneo): da el label del tab Vista Torneo.
+  tournament?: { shortName: string } | null;
 }) {
   // Persist whatever tokens this page knows so tokenless routes (Mundial) can
   // still reach Mi panel / General via the localStorage fallback below.
@@ -104,7 +107,12 @@ export function BottomNav({
         emoji: "📋",
         to: storedJoin ? `/q/${id}/join/${storedJoin}` : null,
       },
-      { key: "mundial", label: "Mundial", emoji: "🌍", to: `/q/${id}/mundial` },
+      {
+        key: "mundial",
+        label: tournament?.shortName ?? "Mundial",
+        emoji: "🌍",
+        to: `/q/${id}/torneo`,
+      },
     ];
 
   return (

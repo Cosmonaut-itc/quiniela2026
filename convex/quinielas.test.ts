@@ -447,6 +447,21 @@ describe("getMode", () => {
     expect((await t.query(api.quinielas.getMode, { id: c.quinielaId })).gameMode).toBe("clasica");
     expect((await t.query(api.quinielas.getMode, { id: p.quinielaId })).gameMode).toBe("progol");
   });
+
+  it("devuelve el torneo de la quiniela (legacy = Mundial)", async () => {
+    const t = await seeded();
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "PL-T1", name: "Arsenal", code: "ARS", crest: "" }, tournamentCode: "PL", format: "liga",
+    });
+    const wc = await t.mutation(api.quinielas.createQuiniela, { name: "C", prizeText: "$1", numParticipants: 4 });
+    const pl = await t.mutation(api.quinielas.createQuiniela, {
+      name: "P", prizeText: "$1", numParticipants: 0, gameMode: "progol", tournamentCode: "PL",
+    });
+    expect((await t.query(api.quinielas.getMode, { id: wc.quinielaId })).tournament)
+      .toMatchObject({ code: "WC", shortName: "Mundial", format: "eliminatorio" });
+    expect((await t.query(api.quinielas.getMode, { id: pl.quinielaId })).tournament)
+      .toMatchObject({ code: "PL", shortName: "Premier", format: "liga" });
+  });
 });
 
 describe("notes", () => {

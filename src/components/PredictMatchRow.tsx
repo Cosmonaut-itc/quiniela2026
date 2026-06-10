@@ -1,5 +1,6 @@
 import type { ProgolMatchView, Pick } from "@/../convex/types";
 import { PickSelector } from "@/components/PickSelector";
+import { TeamFlag } from "@/components/TeamCard";
 import { whenLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +20,7 @@ export function PredictMatchRow({
     <div className="grain relative overflow-hidden rounded-2xl border border-border bg-card px-3.5 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span className="text-lg leading-none">{m.home?.flag ?? "❔"}</span>
+          {m.home ? <TeamFlag flag={m.home.flag} name={m.home.name} className="text-lg leading-none" /> : <span className="text-lg leading-none">❔</span>}
           <span className="truncate text-sm font-medium">{homeCode}</span>
         </span>
         {m.state === "finished" ? (
@@ -29,7 +30,7 @@ export function PredictMatchRow({
         )}
         <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right">
           <span className="truncate text-sm font-medium">{awayCode}</span>
-          <span className="text-lg leading-none">{m.away?.flag ?? "❔"}</span>
+          {m.away ? <TeamFlag flag={m.away.flag} name={m.away.name} className="text-lg leading-none" /> : <span className="text-lg leading-none">❔</span>}
         </span>
       </div>
 

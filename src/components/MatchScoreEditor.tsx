@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AdminMatchView } from "@/../convex/types";
 import { SectionHeading } from "@/components/bits";
+import { TeamFlag } from "@/components/TeamCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckIcon } from "lucide-react";
@@ -84,7 +85,7 @@ export function MatchScoreEditor({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="text-lg leading-none">{m.homeTeam!.flag}</span>
+                    <TeamFlag flag={m.homeTeam!.flag} name={m.homeTeam!.name} className="text-lg leading-none" />
                     <span className="truncate text-sm font-medium">{m.homeTeam!.code}</span>
                   </span>
                   <Input
@@ -104,7 +105,7 @@ export function MatchScoreEditor({
                   />
                   <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right">
                     <span className="truncate text-sm font-medium">{m.awayTeam!.code}</span>
-                    <span className="text-lg leading-none">{m.awayTeam!.flag}</span>
+                    <TeamFlag flag={m.awayTeam!.flag} name={m.awayTeam!.name} className="text-lg leading-none" />
                   </span>
                   <Button
                     size="icon" className="size-9 shrink-0 rounded-lg" disabled={saving}

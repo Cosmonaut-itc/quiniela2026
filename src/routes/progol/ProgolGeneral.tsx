@@ -31,6 +31,7 @@ function LoadingState() {
 
 export function ProgolGeneral({ id, joinToken }: { id: string; joinToken: string }) {
   const data = useQuery(api.progol.getGeneral, { joinToken });
+  const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
   const join = useMutation(api.participants.joinQuiniela);
   const { upload, uploading } = usePhotoUpload();
   const nav = useNavigate();
@@ -61,7 +62,7 @@ export function ProgolGeneral({ id, joinToken }: { id: string; joinToken: string
   }
 
   return (
-    <Shell bottomNav={<BottomNav id={id} active="general" joinToken={joinToken} />}>
+    <Shell bottomNav={<BottomNav id={id} active="general" joinToken={joinToken} tournament={mode?.tournament} />}>
       <header className="grain bg-pitch header-safe relative -mx-4 overflow-hidden rounded-b-3xl border-b border-border px-4 pb-6">
         <div className="flex items-center gap-3.5">
           {quiniela.photoUrl ? (

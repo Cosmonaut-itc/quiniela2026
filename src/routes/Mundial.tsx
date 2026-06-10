@@ -4,6 +4,7 @@ import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { GroupsView } from "@/components/GroupsView";
 import { BracketView } from "@/components/BracketView";
+import { StandingsView } from "@/components/StandingsView";
 import { Shell, BottomNav } from "@/components/Shell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,20 +23,38 @@ function LoadingState() {
   );
 }
 
+/** Vista Torneo adaptativa: grupos + bracket en eliminatorios, tabla en ligas. */
 export default function Mundial() {
   const { id } = useParams();
-  const data = useQuery(api.mundial.getMundial, { quinielaId: id as Id<"quinielas"> });
+  const data = useQuery(api.mundial.getTorneo, { quinielaId: id as Id<"quinielas"> });
 
   if (data === undefined) return <LoadingState />;
 
+  const bottomNav = <BottomNav id={id!} active="mundial" tournament={data.tournament} />;
+  const header = (
+    <header className="mb-1 flex items-center gap-2">
+      <span className="text-2xl">🌍</span>
+      <h1 className="font-heading text-2xl font-extrabold tracking-tight">
+        {data.tournament.shortName}
+      </h1>
+    </header>
+  );
+
+  if (data.kind === "league") {
+    return (
+      <Shell bottomNav={bottomNav}>
+        {header}
+        <p className="mb-4 text-sm text-muted-foreground">
+          Tabla de posiciones del torneo.
+        </p>
+        <StandingsView standings={data.standings} />
+      </Shell>
+    );
+  }
+
   return (
-    <Shell bottomNav={<BottomNav id={id!} active="mundial" />}>
-      <header className="mb-1 flex items-center gap-2">
-        <span className="text-2xl">🌍</span>
-        <h1 className="font-heading text-2xl font-extrabold tracking-tight">
-          Mundial 2026
-        </h1>
-      </header>
+    <Shell bottomNav={bottomNav}>
+      {header}
       <p className="mb-4 text-sm text-muted-foreground">
         {data.showOwners
           ? "Cada equipo lleva la cara de su dueño."

@@ -1,6 +1,7 @@
 import type { OverviewData } from "@/../convex/types";
 import { ChevronDown } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
+import { TeamFlag } from "@/components/TeamCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,7 +19,7 @@ function PlayerTeamRow({ t }: { t: Player["teams"][number] }) {
   return (
     <li className={cn("flex items-center justify-between gap-2", out && "opacity-45")}>
       <span className="flex min-w-0 items-center gap-2">
-        <span className="text-lg leading-none">{t.team.flag}</span>
+        <TeamFlag flag={t.team.flag} name={t.team.name} className="text-lg leading-none" />
         <span className={cn("truncate text-sm", out && "line-through")}>
           {t.team.name}
         </span>

@@ -1,5 +1,6 @@
 import type { OverviewData } from "@/../convex/types";
 import { whenLabel } from "@/lib/format";
+import { TeamFlag } from "@/components/TeamCard";
 
 /**
  * An upcoming head-to-head between two participants of the quiniela:
@@ -11,7 +12,7 @@ export function DuelRow({ d }: { d: OverviewData["upcomingDuels"][number] }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right">
           <span className="truncate text-sm font-semibold">{d.homeOwner}</span>
-          <span className="text-xl leading-none">{d.homeTeam.flag}</span>
+          <TeamFlag flag={d.homeTeam.flag} name={d.homeTeam.name} className="text-xl leading-none" />
         </div>
 
         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-bold tracking-wide text-muted-foreground">
@@ -19,7 +20,7 @@ export function DuelRow({ d }: { d: OverviewData["upcomingDuels"][number] }) {
         </span>
 
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span className="text-xl leading-none">{d.awayTeam.flag}</span>
+          <TeamFlag flag={d.awayTeam.flag} name={d.awayTeam.name} className="text-xl leading-none" />
           <span className="truncate text-sm font-semibold">{d.awayOwner}</span>
         </div>
       </div>

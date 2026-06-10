@@ -1,4 +1,5 @@
 import type { MundialData } from "@/../convex/types";
+import { TeamFlag } from "@/components/TeamCard";
 import { cn } from "@/lib/utils";
 
 type BracketMatch = MundialData["bracket"][number]["matches"][number];
@@ -28,7 +29,7 @@ function SideRow({
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5">
-        <span className="text-base leading-none">{side.team.flag}</span>
+        <TeamFlag flag={side.team.flag} name={side.team.name} className="text-base leading-none" />
         <span
           className={cn(
             "text-xs font-medium",

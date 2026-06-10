@@ -7,7 +7,7 @@ import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/di
 import { teamLite, photoUrl, prizeView, sortPlayerTeams, gameModeOf } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
 import { tournamentByCode, tournamentCodeOf } from "./lib/tournaments";
-import type { OverviewData, PlayerStatus, AdminData, AssignMode, GameMode } from "./types";
+import type { OverviewData, PlayerStatus, AdminData, AssignMode, GameMode, TournamentInfo } from "./types";
 import { insertNotification } from "./notifications";
 import { quinielaClosedNotice, teamsAssignedNotice } from "./lib/notify";
 
@@ -294,9 +294,13 @@ export const getAdmin = query({
 
 export const getMode = query({
   args: { id: v.id("quinielas") },
-  handler: async (ctx, args): Promise<{ gameMode: GameMode }> => {
+  handler: async (ctx, args): Promise<{ gameMode: GameMode; tournament: TournamentInfo }> => {
     const qn = await ctx.db.get(args.id);
     if (!qn) throw new Error("Quiniela no encontrada");
-    return { gameMode: gameModeOf(qn) };
+    const t = tournamentByCode(tournamentCodeOf(qn));
+    return {
+      gameMode: gameModeOf(qn),
+      tournament: { code: t?.code ?? "WC", shortName: t?.shortName ?? "Mundial", format: t?.format ?? "eliminatorio" },
+    };
   },
 });
