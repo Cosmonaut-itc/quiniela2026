@@ -1,5 +1,5 @@
 // convex/tournaments.ts
-import { query, action } from "./_generated/server";
+import { query, action, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import {
@@ -42,6 +42,23 @@ export const list = query({
       allowedModes: allowedGameModes(t.format),
       teamCount: countByCode.get(t.code) ?? 0,
     }));
+  },
+});
+
+/** Torneos referidos por quinielas vivas: lo único que el cron sincroniza (ADR-0001). */
+export const activeTournamentCodes = internalQuery({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => {
+    const codes = new Set<string>();
+    for (const status of ["open", "locked"] as const) {
+      const rows = await ctx.db
+        .query("quinielas")
+        .withIndex("by_status", (q) => q.eq("status", status))
+        .collect();
+      for (const qn of rows) codes.add(tournamentCodeOf(qn));
+    }
+    return [...codes];
   },
 });
 
