@@ -39,6 +39,31 @@ describe("runSyncCycle", () => {
     expect(pause).not.toHaveBeenCalled();
   });
 
+  it("un syncOne que LANZA no aborta el resto", async () => {
+    // syncTournament atrapa sus errores de aplicación, pero ctx.runAction puede
+    // rechazar por errores de sistema de Convex (fallos transitorios, timeout
+    // de la action hija); el ciclo debe tratarlo como un fallo más.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const syncOne = vi.fn(async (code: string) => {
+        if (code === "PL") throw new Error("transient Convex failure");
+        return { ok: true };
+      });
+      const pause = vi.fn(async () => {});
+
+      const synced = await runSyncCycle(["WC", "PL", "SA"], syncOne, pause);
+
+      expect(synced).toEqual(["WC", "SA"]);
+      expect(syncOne).toHaveBeenCalledTimes(3);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const mensaje = String(errorSpy.mock.calls[0]?.join(" "));
+      expect(mensaje).toContain("PL");
+      expect(mensaje).toContain("transient Convex failure");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("un fallo intermedio no aborta el resto y queda fuera de synced", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {

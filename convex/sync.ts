@@ -42,15 +42,17 @@ export const syncTournament = internalAction({
   },
 });
 
-// Free tier: 10 llamadas/min. Entre torneos esperamos 6.5s para nunca rebasarlo
-// aunque el ciclo sincronice los 12 del catálogo.
-export const SPACING_MS = 6_500;
+// Free tier: 10 llamadas/min. Con pausas de 7s, 9 pausas colocan la 10ª llamada
+// en t=63s: nunca caben más de 9 llamadas en cualquier ventana rodante de 60s,
+// aunque el ciclo sincronice los 12 torneos del catálogo.
+export const SPACING_MS = 7_000;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Cuerpo puro del ciclo (deps inyectadas para testear sin dormir de verdad):
  *  recorre los torneos secuencialmente con pausa ENTRE llamadas — nunca antes
  *  de la primera. Un fallo se registra (logs de Convex) y no aborta el resto;
- *  syncTournament atrapa sus propios errores, así que syncOne nunca lanza. */
+ *  el catch sobre syncOne lo garantiza incluso si la promesa rechaza (errores
+ *  de sistema de Convex en ctx.runAction: fallos transitorios, timeouts). */
 export async function runSyncCycle(
   codes: string[],
   syncOne: (code: string) => Promise<{ ok: boolean; error?: string }>,
@@ -59,7 +61,7 @@ export async function runSyncCycle(
   const synced: string[] = [];
   for (const [i, code] of codes.entries()) {
     if (i > 0) await pause(SPACING_MS);
-    const res = await syncOne(code);
+    const res = await syncOne(code).catch((e) => ({ ok: false, error: String(e) }));
     if (res.ok) synced.push(code);
     else console.error(`sync de ${code} falló: ${res.error}`);
   }
