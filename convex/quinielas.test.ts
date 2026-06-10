@@ -462,6 +462,18 @@ describe("getMode", () => {
     expect((await t.query(api.quinielas.getMode, { id: pl.quinielaId })).tournament)
       .toMatchObject({ code: "PL", shortName: "Premier", format: "liga" });
   });
+
+  it("un código fuera del catálogo conserva su code (mismo fallback que getTorneo)", async () => {
+    const t = await seeded();
+    const id = await t.run(async (ctx) =>
+      ctx.db.insert("quinielas", {
+        name: "X", prizeText: "", numParticipants: 0, slotSizes: [],
+        adminToken: "ax", joinToken: "jx", status: "open", createdAt: 1,
+        gameMode: "progol", tournamentCode: "XYZ",
+      }));
+    expect((await t.query(api.quinielas.getMode, { id })).tournament)
+      .toMatchObject({ code: "XYZ", shortName: "XYZ", format: "eliminatorio" });
+  });
 });
 
 describe("notes", () => {

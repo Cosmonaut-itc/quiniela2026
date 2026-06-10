@@ -297,10 +297,12 @@ export const getMode = query({
   handler: async (ctx, args): Promise<{ gameMode: GameMode; tournament: TournamentInfo }> => {
     const qn = await ctx.db.get(args.id);
     if (!qn) throw new Error("Quiniela no encontrada");
-    const t = tournamentByCode(tournamentCodeOf(qn));
+    // Mismo fallback que getTorneo para códigos fuera del catálogo: el code crudo.
+    const code = tournamentCodeOf(qn);
+    const t = tournamentByCode(code);
     return {
       gameMode: gameModeOf(qn),
-      tournament: { code: t?.code ?? "WC", shortName: t?.shortName ?? "Mundial", format: t?.format ?? "eliminatorio" },
+      tournament: { code, shortName: t?.shortName ?? code, format: t?.format ?? "eliminatorio" },
     };
   },
 });

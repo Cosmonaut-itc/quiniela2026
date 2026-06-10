@@ -35,7 +35,7 @@ export function ProgolPersonal({ id, personalToken }: { id: string; personalToke
   // (estado derivado de currentRonda, sin setState en effects — regla del repo).
   const [ronda, setRonda] = useState<string | null>(null);
 
-  if (data === undefined) return <LoadingState />;
+  if (data === undefined || mode === undefined) return <LoadingState />;
   const { who } = data;
 
   const isLiga = mode?.tournament.format === "liga";
