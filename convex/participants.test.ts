@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
+import { tournamentCodeOf } from "./lib/tournaments";
 
 async function setup(n: number) {
   const t = convexTest(schema, import.meta.glob("./**/*.*s"));
@@ -58,6 +59,40 @@ describe("joinQuiniela", () => {
     const owns = await t.run((ctx) =>
       ctx.db.query("ownerships").withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect());
     expect(owns.length).toBe(0); // teams wait for the admin's manual reveal
+  });
+
+  it("joinQuiniela reparte solo equipos del torneo de la quiniela", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    // 4 equipos WC + 12 PL: el sorteo on_join debe ignorar por completo los de PL.
+    for (const ext of ["w1", "w2", "w3", "w4"]) {
+      await t.mutation(internal.matches.upsertTeam, {
+        team: { externalId: ext, name: ext, code: ext, crest: "" }, tournamentCode: "WC", format: "eliminatorio",
+      });
+    }
+    for (let i = 1; i <= 12; i++) {
+      await t.mutation(internal.matches.upsertTeam, {
+        team: { externalId: `p${i}`, name: `p${i}`, code: `p${i}`, crest: "" }, tournamentCode: "PL", format: "liga",
+      });
+    }
+    // 4 equipos WC y 2 participantes → slots [2, 2]: los joins agotan el pool del torneo
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Mini WC", prizeText: "$1", numParticipants: 2, gameMode: "clasica", tournamentCode: "WC",
+    });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Ana" });
+    await t.mutation(api.participants.joinQuiniela, { joinToken: q.joinToken, name: "Beto" });
+    await t.run(async (ctx) => {
+      const teams = await ctx.db.query("teams").collect();
+      const wcIds = new Set(teams.filter((tm) => tournamentCodeOf(tm) === "WC").map((tm) => tm._id as string));
+      const owns = await ctx.db.query("ownerships")
+        .withIndex("by_quiniela", (x) => x.eq("quinielaId", q.quinielaId)).collect();
+      expect(owns).toHaveLength(4);
+      for (const o of owns) {
+        const team = (await ctx.db.get(o.teamId))!;
+        expect(tournamentCodeOf(team)).toBe("WC");
+      }
+      // La unión de equipos asignados es EXACTAMENTE el pool WC sembrado
+      expect(new Set(owns.map((o) => o.teamId as string))).toEqual(wcIds);
+    });
   });
 });
 

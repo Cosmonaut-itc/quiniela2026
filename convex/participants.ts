@@ -5,6 +5,7 @@ import { newToken } from "./lib/tokens";
 import { drawN } from "./lib/distribution";
 import { teamLite, photoUrl, prizeView, gameModeOf } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
+import { tournamentCodeOf } from "./lib/tournaments";
 import type { Id } from "./_generated/dataModel";
 import type { PersonalData, PlayerStatus } from "./types";
 import { insertNotification } from "./notifications";
@@ -41,7 +42,11 @@ export const joinQuiniela = mutation({
       const owned = await ctx.db.query("ownerships").withIndex("by_quiniela", (q) => q.eq("quinielaId", qn._id)).collect();
       const ownedSet = new Set(owned.map((o) => o.teamId));
       const allTeams = await ctx.db.query("teams").collect();
-      const pool = allTeams.filter((tm) => !ownedSet.has(tm._id)).map((tm) => tm._id);
+      // El pool es por torneo: solo equipos del torneo de la quiniela (simétrico a redistributeAndLock).
+      const tCode = tournamentCodeOf(qn);
+      const pool = allTeams
+        .filter((tm) => tournamentCodeOf(tm) === tCode && !ownedSet.has(tm._id))
+        .map((tm) => tm._id);
       const { picked } = drawN(pool, size, Math.random);
       for (const teamId of picked) {
         await ctx.db.insert("ownerships", { quinielaId: qn._id, teamId, participantId });
