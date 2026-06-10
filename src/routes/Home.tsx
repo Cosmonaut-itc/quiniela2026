@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePhotoUpload } from "@/lib/usePhotoUpload";
@@ -14,8 +15,12 @@ const FLAGS = ["🇲🇽", "🇧🇷", "🇦🇷", "🇫🇷", "🇪🇸", "🏴
 
 export default function Home() {
   const create = useMutation(api.quinielas.createQuiniela);
+  const prepare = useAction(api.tournaments.prepare);
   const { upload, uploading } = usePhotoUpload();
   const nav = useNavigate();
+  const tournaments = useQuery(api.tournaments.list, {}) ?? [];
+  const [tournamentCode, setTournamentCode] = useState("WC");
+  const [preparing, setPreparing] = useState(false);
   const [name, setName] = useState("");
   const [prize, setPrize] = useState("");
   const [n, setN] = useState(10);
@@ -28,6 +33,29 @@ export default function Home() {
   const [fee, setFee] = useState(200);
   const [gameMode, setGameMode] = useState<"clasica" | "progol">("clasica");
   const [busy, setBusy] = useState(false);
+
+  // Derived state — no setState in effects
+  const tournament = tournaments.find((t) => t.code === tournamentCode);
+  const modes = tournament?.allowedModes ?? ["clasica", "progol"];
+  const effectiveGameMode = modes.includes(gameMode) ? gameMode : "progol";
+  const maxParticipants = tournament?.teamCount || 48;
+
+  async function selectTournament(code: string) {
+    setTournamentCode(code);
+    const t = tournaments.find((x) => x.code === code);
+    if (t && t.teamCount === 0) {
+      setPreparing(true);
+      try {
+        await prepare({ code });
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "No se pudo preparar el torneo",
+        );
+      } finally {
+        setPreparing(false);
+      }
+    }
+  }
 
   async function submit() {
     if (!name.trim() || n < 2) return;
@@ -43,7 +71,8 @@ export default function Home() {
         prizeMode,
         entryFee: prizeMode === "per_person" ? fee : undefined,
         notes,
-        gameMode,
+        gameMode: effectiveGameMode,
+        tournamentCode,
       });
       nav(`/q/${res.quinielaId}/admin/${res.adminToken}`);
     } finally {
@@ -52,7 +81,7 @@ export default function Home() {
   }
 
   const disabled =
-    busy || uploading || !name.trim() || n < 2 ||
+    busy || uploading || preparing || !name.trim() || n < 2 ||
     (prizeMode === "per_person" && fee < 1);
 
   return (
@@ -66,13 +95,13 @@ export default function Home() {
             ))}
           </div>
           <p className="text-xs font-bold tracking-[0.22em] text-gold uppercase">
-            Mundial 2026
+            {tournament?.name ?? "Mundial 2026"}
           </p>
           <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight">
             Quiniela Mundial
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {gameMode === "progol"
+            {effectiveGameMode === "progol"
               ? "Crea tu quiniela, pronostica cada partido y que gane quien más acierte. 🎯"
               : "Crea tu quiniela, reparte equipos al azar y que gane el dueño del campeón. 🏆"}
           </p>
@@ -86,31 +115,97 @@ export default function Home() {
             void submit();
           }}
         >
+          {/* Selector de torneo */}
+          <div className="flex flex-col gap-2">
+            <Label>Torneo</Label>
+            {tournaments.length === 0 ? (
+              <div className="h-10 animate-pulse rounded-lg bg-muted" />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {tournaments.map((t) => {
+                  const active = tournamentCode === t.code;
+                  const formatBadge =
+                    t.format === "eliminatorio" ? "Eliminatorio" : "Liga";
+                  return (
+                    <button
+                      key={t.code}
+                      type="button"
+                      onClick={() => void selectTournament(t.code)}
+                      aria-pressed={active}
+                      disabled={preparing}
+                      className={
+                        "flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-left text-sm transition-colors " +
+                        (active
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-card text-muted-foreground hover:border-foreground/30")
+                      }
+                    >
+                      <span className="font-semibold">{t.shortName}</span>
+                      <span
+                        className={
+                          "rounded px-1 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide " +
+                          (t.format === "eliminatorio"
+                            ? "bg-gold/20 text-gold"
+                            : "bg-primary/20 text-primary")
+                        }
+                      >
+                        {formatBadge}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {preparing && (
+              <p className="text-xs text-muted-foreground">
+                Preparando torneo… esto puede tardar unos segundos.
+              </p>
+            )}
+          </div>
+
+          {/* Modo de juego */}
           <div className="flex flex-col gap-2">
             <Label>Modo de juego</Label>
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
-                  { v: "clasica", title: "Clásica", sub: "Se reparten los 48 equipos; gana el dueño del campeón." },
-                  { v: "progol", title: "Progol 🎯", sub: "Cada quien pronostica 1/X/2 por partido; gana quien más acierte." },
+                  {
+                    v: "clasica",
+                    title: "Clásica",
+                    sub: `Se reparten los ${maxParticipants} equipos; gana el dueño del campeón.`,
+                  },
+                  {
+                    v: "progol",
+                    title: "Progol 🎯",
+                    sub: "Cada quien pronostica 1/X/2 por partido; gana quien más acierte.",
+                  },
                 ] as const
               ).map((o) => {
-                const active = gameMode === o.v;
+                const active = effectiveGameMode === o.v;
+                const available = modes.includes(o.v);
                 return (
                   <button
                     key={o.v}
                     type="button"
                     onClick={() => setGameMode(o.v)}
                     aria-pressed={active}
+                    disabled={!available}
                     className={
                       "rounded-2xl border px-3 py-2.5 text-left transition-colors " +
                       (active
                         ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-card text-muted-foreground hover:border-foreground/30")
+                        : available
+                          ? "border-border bg-card text-muted-foreground hover:border-foreground/30"
+                          : "cursor-not-allowed border-border bg-card/50 text-muted-foreground/40")
                     }
                   >
                     <div className="text-sm font-bold text-foreground">{o.title}</div>
                     <div className="mt-0.5 text-[0.7rem] leading-snug">{o.sub}</div>
+                    {!available && (
+                      <div className="mt-1 text-[0.6rem] italic">
+                        No disponible para este torneo
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -199,7 +294,7 @@ export default function Home() {
             )}
           </div>
 
-          {gameMode === "clasica" && (<>
+          {effectiveGameMode === "clasica" && (<>
           <div className="flex flex-col gap-2">
             <Label htmlFor="n">
               {prizeMode === "per_person"
@@ -211,21 +306,24 @@ export default function Home() {
               type="number"
               inputMode="numeric"
               min={2}
-              max={48}
+              max={maxParticipants}
               value={n}
               onChange={(e) =>
                 setN(
                   Math.max(
                     2,
-                    Math.min(48, Math.floor(Number(e.target.value) || 0)),
+                    Math.min(
+                      maxParticipants,
+                      Math.floor(Number(e.target.value) || 0),
+                    ),
                   ),
                 )
               }
             />
             <p className="text-xs text-muted-foreground">
               {prizeMode === "per_person"
-                ? "Tope de gente; el bote refleja a quienes ya pagaron (tú confirmas cada pago). Los 48 equipos se reparten entre ustedes."
-                : "Entre 2 y 48 · los 48 equipos se reparten entre ustedes."}
+                ? `Tope de gente; el bote refleja a quienes ya pagaron (tú confirmas cada pago). Los ${maxParticipants} equipos se reparten entre ustedes.`
+                : `Entre 2 y ${maxParticipants} · los ${maxParticipants} equipos se reparten entre ustedes.`}
             </p>
           </div>
 
@@ -301,7 +399,7 @@ export default function Home() {
             disabled={disabled}
             className="glow-primary h-12 rounded-2xl text-base font-bold"
           >
-            {busy ? "Creando…" : "⚽ Crear quiniela"}
+            {preparing ? "Preparando torneo…" : busy ? "Creando…" : "⚽ Crear quiniela"}
           </Button>
         </form>
 
