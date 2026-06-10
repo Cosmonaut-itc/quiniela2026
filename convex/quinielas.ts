@@ -6,6 +6,7 @@ import { newToken } from "./lib/tokens";
 import { computeSlotSizes, shuffleInPlace, balancedRedistribute } from "./lib/distribution";
 import { teamLite, photoUrl, prizeView, sortPlayerTeams, gameModeOf } from "./lib/view";
 import { resolveQuiniela } from "./lib/perQuiniela";
+import { tournamentByCode, tournamentCodeOf } from "./lib/tournaments";
 import type { OverviewData, PlayerStatus, AdminData, AssignMode, GameMode } from "./types";
 import { insertNotification } from "./notifications";
 import { quinielaClosedNotice, teamsAssignedNotice } from "./lib/notify";
@@ -69,12 +70,23 @@ export const createQuiniela = mutation({
     entryFee: v.optional(v.number()),   // requerido en per_person
     notes: v.optional(v.string()),
     gameMode: v.optional(v.string()),   // "clasica" | "progol"
+    tournamentCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // --- validación de torneo ---
+    const code = args.tournamentCode ?? "WC";
+    const tournament = tournamentByCode(code);
+    if (!tournament) throw new Error("Torneo fuera del catálogo");
     const isProgol = args.gameMode === "progol";
+    if (!isProgol && tournament.format !== "eliminatorio")
+      throw new Error(`${tournament.name} no admite Clásica (solo Progol)`);
+    const allTeams = await ctx.db.query("teams").collect();
+    const teamCount = allTeams.filter((t) => tournamentCodeOf(t) === code).length;
+    if (teamCount === 0) throw new Error("Torneo sin datos; prepáralo primero");
+    // --- cálculo de slots ---
     // progol: sin tope (centinela 0) ni reparto de equipos (slotSizes vacío).
-    const n = isProgol ? 0 : Math.max(1, Math.min(48, Math.floor(args.numParticipants)));
-    const slotSizes = isProgol ? [] : shuffleInPlace(computeSlotSizes(n, 48), Math.random);
+    const n = isProgol ? 0 : Math.max(1, Math.min(teamCount, Math.floor(args.numParticipants)));
+    const slotSizes = isProgol ? [] : shuffleInPlace(computeSlotSizes(n, teamCount), Math.random);
     const adminToken = newToken();
     const joinToken = newToken();
     const perPerson = args.prizeMode === "per_person";
@@ -95,6 +107,7 @@ export const createQuiniela = mutation({
       photoId: args.photoId,
       notes: notes || undefined,
       createdAt: Date.now(),
+      tournamentCode: code,
     });
     return { quinielaId, adminToken, joinToken };
   },

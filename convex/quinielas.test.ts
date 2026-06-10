@@ -298,6 +298,49 @@ describe("createQuiniela progol", () => {
   });
 });
 
+describe("multi-torneo", () => {
+  it("createQuiniela clásica rechaza torneos de liga", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await t.mutation(internal.matches.upsertTeam, {
+      team: { externalId: "57", name: "Arsenal", code: "ARS", crest: "" }, tournamentCode: "PL", format: "liga",
+    });
+    await expect(
+      t.mutation(api.quinielas.createQuiniela, {
+        name: "Liga clásica", prizeText: "x", numParticipants: 4,
+        gameMode: "clasica", tournamentCode: "PL",
+      }),
+    ).rejects.toThrow(/no admite Clásica/);
+  });
+
+  it("createQuiniela rechaza torneos sin datos", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    await expect(
+      t.mutation(api.quinielas.createQuiniela, {
+        name: "Sin datos", prizeText: "x", numParticipants: 0,
+        gameMode: "progol", tournamentCode: "SA",
+      }),
+    ).rejects.toThrow(/sin datos/);
+  });
+
+  it("clásica calcula slots con los equipos DEL torneo (no 48 fijos)", async () => {
+    const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+    // WC con solo 4 equipos sembrados: 2 participantes → 2 equipos cada uno
+    for (const ext of ["1", "2", "3", "4"]) {
+      await t.mutation(internal.matches.upsertTeam, {
+        team: { externalId: ext, name: ext, code: ext, crest: "" }, tournamentCode: "WC", format: "eliminatorio",
+      });
+    }
+    const res = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Mini", prizeText: "x", numParticipants: 2, gameMode: "clasica", tournamentCode: "WC",
+    });
+    await t.run(async (ctx) => {
+      const qn = (await ctx.db.query("quinielas").collect()).find((q) => q.adminToken === res.adminToken)!;
+      expect(qn.slotSizes.reduce((a, b) => a + b, 0)).toBe(4);
+      expect(qn.tournamentCode).toBe("WC");
+    });
+  });
+});
+
 describe("getMode", () => {
   it("devuelve el modo de la quiniela", async () => {
     const t = await seeded();
