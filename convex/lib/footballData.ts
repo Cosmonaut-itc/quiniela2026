@@ -1,8 +1,9 @@
 // convex/lib/footballData.ts
-// Maps football-data.org /competitions/WC responses to our internal ApiMatch shape.
+// Maps football-data.org /competitions/{code}/responses to our internal ApiMatch shape.
 const STAGE: Record<string, string> = {
   GROUP_STAGE: "group", LAST_32: "r32", LAST_16: "r16",
   QUARTER_FINALS: "qf", SEMI_FINALS: "sf", THIRD_PLACE: "third", FINAL: "final",
+  REGULAR_SEASON: "league", PLAYOFFS: "r16",
 };
 const STATUS: Record<string, string> = {
   SCHEDULED: "scheduled", TIMED: "scheduled", IN_PLAY: "live", PAUSED: "live",
@@ -21,6 +22,7 @@ export type ApiMatch = {
   homeExternalId: string | null; awayExternalId: string | null;
   kickoffAt: number; homeScore: number | null; awayScore: number | null;
   status: string; winnerExternalId: string | null; bracketSlot: string | null;
+  matchday: number | null;
 };
 
 // Minimal shape of the football-data.org /matches payload. Fields are optional
@@ -39,6 +41,7 @@ type RawMatch = {
   homeTeam?: RawTeam | null;
   awayTeam?: RawTeam | null;
   score?: RawScore | null;
+  matchday?: number | null;
 };
 type RawResponse = { matches?: RawMatch[] };
 
@@ -55,7 +58,7 @@ export function mapMatches(json: RawResponse): ApiMatch[] {
     const winnerExternalId =
       w === "HOME_TEAM" ? homeExternalId : w === "AWAY_TEAM" ? awayExternalId : null;
     let bracketSlot: string | null = null;
-    if (stage !== "group") {
+    if (stage !== "group" && stage !== "league") {
       const n = (stageCounters.get(stage) ?? 0) + 1;
       stageCounters.set(stage, n);
       bracketSlot = `${stage}-${n}`;
@@ -72,11 +75,16 @@ export function mapMatches(json: RawResponse): ApiMatch[] {
       status: (m.status ? STATUS[m.status] : undefined) ?? "scheduled",
       winnerExternalId,
       bracketSlot,
+      matchday: m.matchday ?? null,
     };
   });
 }
 
-const WC_MATCHES_URL = "https://api.football-data.org/v4/competitions/WC/matches";
+const matchesUrl = (code: string) =>
+  `https://api.football-data.org/v4/competitions/${code}/matches`;
+const teamsUrl = (code: string) =>
+  `https://api.football-data.org/v4/competitions/${code}/teams`;
+
 const MAX_RETRY_WAIT_MS = 60_000;
 const DEFAULT_BACKOFF_MS = 1_000;
 
@@ -93,11 +101,10 @@ type FetchDeps = {
   sleep?: (ms: number) => Promise<void>;
 };
 
-export async function fetchMatches(token: string, deps: FetchDeps = {}): Promise<ApiMatch[]> {
+async function fetchJson(url: string, token: string, deps: FetchDeps): Promise<unknown> {
   const fetchFn = deps.fetchFn ?? fetch;
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const request = () => fetchFn(WC_MATCHES_URL, { headers: { "X-Auth-Token": token } });
-
+  const request = () => fetchFn(url, { headers: { "X-Auth-Token": token } });
   let res = await request();
   if (res.status === 429) {
     // Rate limit: espera lo que pida el servidor y reintenta una sola vez. Si
@@ -106,7 +113,28 @@ export async function fetchMatches(token: string, deps: FetchDeps = {}): Promise
     res = await request();
   }
   if (!res.ok) throw new Error(`football-data ${res.status}`);
-  return mapMatches(await res.json());
+  return res.json();
+}
+
+export type ApiTeam = { externalId: string; name: string; code: string; crest: string };
+
+type RawApiTeam = { id: number | string; name?: string; tla?: string; crest?: string };
+
+export function mapTeams(json: { teams?: RawApiTeam[] }): ApiTeam[] {
+  return (json.teams ?? []).map((t) => ({
+    externalId: String(t.id),
+    name: t.name ?? "",
+    code: t.tla ?? "",
+    crest: t.crest ?? "",
+  }));
+}
+
+export async function fetchMatches(token: string, competitionCode: string, deps: FetchDeps = {}): Promise<ApiMatch[]> {
+  return mapMatches((await fetchJson(matchesUrl(competitionCode), token, deps)) as RawResponse);
+}
+
+export async function fetchTeams(token: string, competitionCode: string, deps: FetchDeps = {}): Promise<ApiTeam[]> {
+  return mapTeams((await fetchJson(teamsUrl(competitionCode), token, deps)) as { teams?: RawApiTeam[] });
 }
 
 // Fallback note: for API-Football, swap fetch URL to

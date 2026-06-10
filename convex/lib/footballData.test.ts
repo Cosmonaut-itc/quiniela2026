@@ -1,6 +1,6 @@
 // convex/lib/footballData.test.ts
 import { describe, it, expect, vi } from "vitest";
-import { mapMatches, retryAfterMs, fetchMatches } from "./footballData";
+import { mapMatches, mapTeams, retryAfterMs, fetchMatches, fetchTeams } from "./footballData";
 
 // Respuesta mínima estilo `fetch` para inyectar en fetchMatches.
 function fakeRes(opts: {
@@ -103,7 +103,7 @@ describe("fetchMatches — rate limit (429)", () => {
 
   it("camino feliz: una sola llamada", async () => {
     const fetchFn = vi.fn().mockResolvedValue(fakeRes({ status: 200, body: okBody }));
-    const out = await fetchMatches("tok", { fetchFn, sleep: vi.fn() });
+    const out = await fetchMatches("tok", "WC", { fetchFn, sleep: vi.fn() });
     expect(fetchFn).toHaveBeenCalledTimes(1);
     expect(out[0].stage).toBe("final");
   });
@@ -113,7 +113,7 @@ describe("fetchMatches — rate limit (429)", () => {
       .mockResolvedValueOnce(fakeRes({ status: 429, retryAfter: "2" }))
       .mockResolvedValueOnce(fakeRes({ status: 200, body: okBody }));
     const sleep = vi.fn().mockResolvedValue(undefined);
-    const out = await fetchMatches("tok", { fetchFn, sleep });
+    const out = await fetchMatches("tok", "WC", { fetchFn, sleep });
     expect(sleep).toHaveBeenCalledWith(2_000);
     expect(fetchFn).toHaveBeenCalledTimes(2);
     expect(out).toHaveLength(1);
@@ -121,13 +121,59 @@ describe("fetchMatches — rate limit (429)", () => {
 
   it("si el 429 persiste tras el reintento, lanza", async () => {
     const fetchFn = vi.fn().mockResolvedValue(fakeRes({ status: 429, retryAfter: "1" }));
-    await expect(fetchMatches("tok", { fetchFn, sleep: vi.fn() })).rejects.toThrow("football-data 429");
+    await expect(fetchMatches("tok", "WC", { fetchFn, sleep: vi.fn() })).rejects.toThrow("football-data 429");
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
   it("otros errores (p. ej. 500/403) no reintentan", async () => {
     const fetchFn = vi.fn().mockResolvedValue(fakeRes({ status: 500 }));
-    await expect(fetchMatches("tok", { fetchFn, sleep: vi.fn() })).rejects.toThrow("football-data 500");
+    await expect(fetchMatches("tok", "WC", { fetchFn, sleep: vi.fn() })).rejects.toThrow("football-data 500");
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("multi-torneo", () => {
+  it("mapea REGULAR_SEASON a stage league con matchday y sin bracketSlot", () => {
+    const out = mapMatches({
+      matches: [{
+        id: 9, stage: "REGULAR_SEASON", matchday: 24, utcDate: "2026-02-01T15:00:00Z",
+        status: "TIMED", homeTeam: { id: 57 }, awayTeam: { id: 65 },
+      }],
+    });
+    expect(out[0]).toMatchObject({ stage: "league", matchday: 24, bracketSlot: null });
+  });
+
+  it("mapea matchday null cuando la API no lo trae", () => {
+    const out = mapMatches({ matches: [{ id: 1, stage: "GROUP_STAGE", status: "TIMED" }] });
+    expect(out[0].matchday).toBeNull();
+  });
+
+  it("mapTeams extrae externalId, tla, nombre y escudo", () => {
+    const out = mapTeams({
+      teams: [{ id: 57, name: "Arsenal FC", tla: "ARS", crest: "https://crests.football-data.org/57.png" }],
+    });
+    expect(out).toEqual([
+      { externalId: "57", name: "Arsenal FC", code: "ARS", crest: "https://crests.football-data.org/57.png" },
+    ]);
+  });
+
+  it("fetchMatches consulta la URL de la competición pedida", async () => {
+    const calls: string[] = [];
+    const fetchFn = (async (url: string) => {
+      calls.push(String(url));
+      return new Response(JSON.stringify({ matches: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await fetchMatches("tok", "PL", { fetchFn });
+    expect(calls[0]).toBe("https://api.football-data.org/v4/competitions/PL/matches");
+  });
+
+  it("fetchTeams consulta /teams de la competición", async () => {
+    const calls: string[] = [];
+    const fetchFn = (async (url: string) => {
+      calls.push(String(url));
+      return new Response(JSON.stringify({ teams: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await fetchTeams("tok", "PL", { fetchFn });
+    expect(calls[0]).toBe("https://api.football-data.org/v4/competitions/PL/teams");
   });
 });

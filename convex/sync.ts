@@ -14,7 +14,7 @@ export const syncMatches = internalAction({
     const token = process.env.FOOTBALL_DATA_TOKEN;
     if (!token) return { ok: false, error: "missing FOOTBALL_DATA_TOKEN" };
     try {
-      const matches = await fetchMatches(token);
+      const matches = await fetchMatches(token, "WC");
       for (const match of matches) {
         await ctx.runMutation(internal.matches.upsertMatchResult, { match });
       }
