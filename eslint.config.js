@@ -7,7 +7,8 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   // Generated Convex code and static data snapshots are not hand-written.
-  globalIgnores(['dist', 'convex/_generated/**', 'convex/data/**']),
+  // La app Expo en native/ trae su propio lint (expo lint); este config solo cubre la web.
+  globalIgnores(['dist', 'convex/_generated/**', 'convex/data/**', 'native/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
