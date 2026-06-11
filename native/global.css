@@ -4,7 +4,8 @@
  * las de la web. La app nativa es tema único oscuro: los valores van en :root,
  * sin variante dark. Las fuentes (--font-heading/--font-sans) llegan con la
  * task de fuentes; las utilities web-only (.grain, .bg-pitch, …) se portan con
- * piezas nativas en tasks posteriores.
+ * piezas nativas en tasks posteriores; los tokens --sidebar-* se omiten porque
+ * el sidebar es web-only.
  */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);

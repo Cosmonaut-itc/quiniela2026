@@ -1,6 +1,7 @@
 // Pantalla smoke provisional: lista los torneos del catálogo para verificar
-// la tubería repo-compartido → Convex y los tokens NativeWind (oklch en
-// runtime). La Task 5 la reemplaza con la demo real.
+// la tubería repo-compartido → Convex y los tokens NativeWind (el compilador
+// convierte oklch a hex en build-time; al runtime sobreviven las variables
+// CSS). La Task 5 la reemplaza con la demo real.
 import { useQuery } from "convex/react";
 // Wrappers con className de react-native-css. Importar desde el índice, no de
 // los subpaths por componente: esos exponen la condición "react-native" que
