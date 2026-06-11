@@ -1,7 +1,7 @@
 import type { ProgolMatchView, Pick } from "@/../convex/types";
 import { PickSelector } from "@/components/PickSelector";
 import { TeamFlag } from "@/components/TeamCard";
-import { whenLabel } from "@/lib/format";
+import { whenLabel } from "@shared/format";
 import { cn } from "@/lib/utils";
 
 const PICK_LABEL: Record<Pick, string> = { home: "Local", draw: "Empate", away: "Visita" };

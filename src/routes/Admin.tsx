@@ -9,7 +9,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { PushOptIn } from "@/components/PushOptIn";
 import { SectionHeading } from "@/components/bits";
 import { PaymentStatusMenu } from "@/components/PaymentStatusMenu";
-import { formatMXN } from "@/lib/format";
+import { formatMXN } from "@shared/format";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";

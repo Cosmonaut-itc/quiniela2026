@@ -9,7 +9,7 @@ import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner } from "@/components/bits";
 import { Leaderboard } from "@/components/Leaderboard";
 import { PredictMatchRow } from "@/components/PredictMatchRow";
-import { prizeBanner } from "@/lib/format";
+import { prizeBanner } from "@shared/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

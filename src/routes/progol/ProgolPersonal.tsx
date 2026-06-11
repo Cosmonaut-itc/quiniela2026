@@ -14,7 +14,7 @@ import { PrizeBanner } from "@/components/bits";
 import { PredictMatchRow } from "@/components/PredictMatchRow";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { prizeBanner } from "@/lib/format";
+import { prizeBanner } from "@shared/format";
 
 function LoadingState() {
   return (

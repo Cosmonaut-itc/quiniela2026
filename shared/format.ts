@@ -1,4 +1,4 @@
-import type { PrizeView } from "@/../convex/types";
+import type { PrizeView } from "../convex/types";
 
 export function formatMXN(n: number): string {
   return `$${n.toLocaleString("es-MX")}`;

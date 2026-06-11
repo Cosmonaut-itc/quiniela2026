@@ -11,7 +11,7 @@ import { PushOptIn } from "@/components/PushOptIn";
 import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
 import { Skeleton } from "@/components/ui/skeleton";
-import { whenLabel, prizeBanner } from "@/lib/format";
+import { whenLabel, prizeBanner } from "@shared/format";
 
 function LoadingState() {
   return (

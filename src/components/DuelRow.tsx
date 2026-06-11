@@ -1,5 +1,5 @@
 import type { OverviewData } from "@/../convex/types";
-import { whenLabel } from "@/lib/format";
+import { whenLabel } from "@shared/format";
 import { TeamFlag } from "@/components/TeamCard";
 
 /**

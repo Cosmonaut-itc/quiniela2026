@@ -9,7 +9,7 @@ import { PlayersTable } from "@/components/PlayersTable";
 import { DuelRow } from "@/components/DuelRow";
 import { Shell, BottomNav } from "@/components/Shell";
 import { SectionHeading, PrizeBanner } from "@/components/bits";
-import { prizeBanner } from "@/lib/format";
+import { prizeBanner } from "@shared/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

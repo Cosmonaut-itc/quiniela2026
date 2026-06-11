@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { readStoredToken, persistToken } from "@/lib/storage";
-import { parsePersonalPanelPath } from "@/lib/personalLink";
+import { parsePersonalPanelPath } from "@shared/personalLink";
 import {
   Dialog,
   DialogContent,

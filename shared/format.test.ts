@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { formatMXN, prizeBanner } from "./format";
-import type { PrizeView } from "@/../convex/types";
+import type { PrizeView } from "../convex/types";
 
 const fixed = (text: string): PrizeView => ({
   mode: "fixed", text, entryFee: null, pool: null, contributors: 0,

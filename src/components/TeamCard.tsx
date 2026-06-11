@@ -1,6 +1,6 @@
 import type { PersonalData } from "@/../convex/types";
 import { Badge } from "@/components/ui/badge";
-import { whenLabel } from "@/lib/format";
+import { whenLabel } from "@shared/format";
 import { cn } from "@/lib/utils";
 
 /**
