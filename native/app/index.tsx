@@ -1,13 +1,11 @@
 // Pantalla smoke provisional: lista los torneos del catálogo para verificar
-// la tubería repo-compartido → Convex y los tokens NativeWind (el compilador
+// la tubería repo-compartido → Convex y los tokens de Uniwind (el compilador
 // convierte oklch a hex en build-time; al runtime sobreviven las variables
 // CSS). La Task 5 la reemplaza con la demo real.
 import { useQuery } from "convex/react";
-// Wrappers con className de react-native-css. Importar desde el índice, no de
-// los subpaths por componente: esos exponen la condición "react-native" que
-// apunta al .tsx fuente y tsc (customConditions de expo/tsconfig.base) lo
-// chequearía sin skipLibCheck.
-import { ScrollView, Text } from "react-native-css/components";
+// Primitivos de react-native a secas: el resolver de uniwind (metro.config.js)
+// los redirige a uniwind/components/* con soporte de className.
+import { ScrollView, Text } from "react-native";
 import { api } from "@convex/_generated/api";
 import { GradientFill, GrainCard, gradients } from "@/components/Grain";
 

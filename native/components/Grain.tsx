@@ -3,10 +3,9 @@
 // un ::after (SVG feTurbulence, opacity .5, mix-blend-mode overlay); aquí lo
 // replica un overlay absoluto con un PNG de ruido tileado.
 import { LinearGradient, type LinearGradientProps } from "expo-linear-gradient";
-import { StyleSheet, type ViewProps } from "react-native";
 // Image de RN (no expo-image): su ImageContentFit no tiene "repeat"; el
 // resizeMode="repeat" de RN sí tilea el PNG a tamaño natural como la web.
-import { Image, View } from "react-native-css/components";
+import { Image, StyleSheet, View, type ViewProps } from "react-native";
 
 // assets/images/noise.png — tile 128x128 gris+alfa generado con un one-off de
 // Python stdlib (zlib+struct, seed 2026): por píxel gris U(0,255) y alfa
@@ -17,7 +16,7 @@ const noise = require("../assets/images/noise.png");
 
 const styles = StyleSheet.create({
   // El ::after web: mix-blend-mode va aquí como style prop porque ImageStyle
-  // no lo tipa (solo ViewStyle) y react-native-css no compila mix-blend-mode
+  // no lo tipa (solo ViewStyle) y uniwind 1.9.0 no compila mix-blend-mode
   // (un className mix-blend-overlay se dropearía en silencio).
   grainOverlay: {
     position: "absolute",

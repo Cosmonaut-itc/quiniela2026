@@ -6,9 +6,8 @@
  * con piezas nativas en tasks posteriores; los tokens --sidebar-* se omiten
  * porque el sidebar es web-only.
  */
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/preflight.css" layer(base);
-@import "tailwindcss/utilities.css";
+@import "tailwindcss";
+@import "uniwind";
 
 @layer theme {
     @theme inline {

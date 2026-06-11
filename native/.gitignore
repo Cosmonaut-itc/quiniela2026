@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Uniwind (generado por metro o `npx uniwind generate-artifacts --css ./global.css`)
+uniwind-types.d.ts
+
 # Native
 .kotlin/
 *.orig.*
