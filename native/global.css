@@ -2,10 +2,9 @@
  * Tokens "estadio nocturno" portados de src/index.css con los MISMOS nombres,
  * para que las clases (bg-card, text-gold, border-border, …) sean idénticas a
  * las de la web. La app nativa es tema único oscuro: los valores van en :root,
- * sin variante dark. Las fuentes (--font-heading/--font-sans) llegan con la
- * task de fuentes; las utilities web-only (.grain, .bg-pitch, …) se portan con
- * piezas nativas en tasks posteriores; los tokens --sidebar-* se omiten porque
- * el sidebar es web-only.
+ * sin variante dark. Las utilities web-only (.grain, .bg-pitch, …) se portan
+ * con piezas nativas en tasks posteriores; los tokens --sidebar-* se omiten
+ * porque el sidebar es web-only.
  */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
@@ -13,6 +12,21 @@
 
 @layer theme {
     @theme inline {
+        /*
+         * Tipografía: el NOMBRE del token es el de la web (font-heading /
+         * font-sans) pero el valor es el nombre de familia REAL del TTF, sin
+         * fallback chain (RN usa una sola familia). En iOS, CoreText agrupa
+         * los estáticos de Google Fonts por su typographic family (nameID 16),
+         * así que "Sora" + font-weight resuelve la cara más cercana entre los
+         * pesos cargados en app/_layout.tsx (expo-font registra el archivo con
+         * CTFontManager y RN matchea por peso dentro de la familia). Android
+         * registra solo el alias por peso y necesitará su propio mapeo cuando
+         * toque. Ojo: en RN no hay herencia CSS, font-sans NO "cae" del root a
+         * los <Text>; se aplica explícito en cada <Text>.
+         */
+        --font-heading: "Bricolage Grotesque";
+        --font-sans: "Sora";
+
         --color-chart-5: var(--chart-5);
         --color-chart-4: var(--chart-4);
         --color-chart-3: var(--chart-3);

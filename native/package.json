@@ -3,6 +3,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@expo-google-fonts/bricolage-grotesque": "^0.4.1",
+    "@expo-google-fonts/sora": "^0.4.2",
     "@expo/ui": "~56.0.17",
     "@tailwindcss/postcss": "^4.3.0",
     "convex": "^1.41.0",

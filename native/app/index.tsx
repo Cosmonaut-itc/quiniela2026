@@ -19,14 +19,22 @@ export default function Index() {
       contentInsetAdjustmentBehavior="automatic"
       contentContainerClassName="p-6 gap-2"
     >
+      {/* font-sans va explícito en cada <Text>: RN no hereda font-family
+          (ver el comentario de los tokens en global.css). */}
+      <Text className="font-heading font-bold text-2xl text-foreground">
+        Quiniela 2026
+      </Text>
       <View className="bg-card border border-border rounded-3xl p-4">
-        <Text className="text-gold text-lg">Estadio nocturno</Text>
+        <Text className="font-sans font-semibold text-gold text-lg">Estadio nocturno</Text>
+        <Text className="font-sans font-medium text-muted-foreground text-sm">
+          Sora medium · semibold arriba · regular abajo
+        </Text>
       </View>
       {tournaments === undefined ? (
-        <Text className="text-foreground">Cargando torneos…</Text>
+        <Text className="font-sans text-foreground">Cargando torneos…</Text>
       ) : (
         tournaments.map((t) => (
-          <Text key={t.code} className="text-foreground text-base">
+          <Text key={t.code} className="font-sans text-foreground text-base">
             {t.name}
           </Text>
         ))
