@@ -7,8 +7,9 @@ import { useQuery } from "convex/react";
 // los subpaths por componente: esos exponen la condición "react-native" que
 // apunta al .tsx fuente y tsc (customConditions de expo/tsconfig.base) lo
 // chequearía sin skipLibCheck.
-import { ScrollView, Text, View } from "react-native-css/components";
+import { ScrollView, Text } from "react-native-css/components";
 import { api } from "@convex/_generated/api";
+import { GradientFill, GrainCard, gradients } from "@/components/Grain";
 
 export default function Index() {
   const tournaments = useQuery(api.tournaments.list, {});
@@ -24,12 +25,20 @@ export default function Index() {
       <Text className="font-heading font-bold text-2xl text-foreground">
         Quiniela 2026
       </Text>
-      <View className="bg-card border border-border rounded-3xl p-4">
+      {/* Smoke del grano: misma receta de clases que una card web con .grain */}
+      <GrainCard className="bg-card border border-border rounded-3xl p-4">
         <Text className="font-sans font-semibold text-gold text-lg">Estadio nocturno</Text>
         <Text className="font-sans font-medium text-muted-foreground text-sm">
           Sora medium · semibold arriba · regular abajo
         </Text>
-      </View>
+      </GrainCard>
+      {/* Smoke del gradiente: el PrizeBanner web (grain + border-gold/30 + gradiente) */}
+      <GrainCard className="border border-gold/30 rounded-2xl px-4 py-3">
+        <GradientFill {...gradients.prizeBanner} />
+        <Text className="font-sans font-semibold text-gold text-sm">
+          🏆 Premio al campeón
+        </Text>
+      </GrainCard>
       {tournaments === undefined ? (
         <Text className="font-sans text-foreground">Cargando torneos…</Text>
       ) : (
