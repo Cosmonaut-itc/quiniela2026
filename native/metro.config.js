@@ -5,7 +5,8 @@ const path = require("path");
 const config = getDefaultConfig(__dirname);
 const repoRoot = path.resolve(__dirname, "..");
 
-// La app importa ../convex (API generada) y ../shared (helpers puros).
+// La app importa ../convex (API generada) y ../shared (helpers puros, lo
+// importará el port de vistas).
 // Invariantes de resolución:
 // - NO añadir la raíz del repo a watchFolders: el convex/ de la raíz ganaría
 //   la resolución jerárquica y se colarían dos copias del paquete convex.
