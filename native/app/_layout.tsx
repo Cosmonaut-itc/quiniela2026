@@ -1,3 +1,4 @@
+import "../global.css";
 import { Stack } from "expo-router";
 import { ConvexProvider } from "convex/react";
 import { convex } from "@/lib/convex";

@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require("expo/metro-config");
+const { withNativewind } = require("nativewind/metro");
 const path = require("path");
 
 const config = getDefaultConfig(__dirname);
@@ -16,4 +17,13 @@ const repoRoot = path.resolve(__dirname, "..");
 //   jerarquía del archivo fuente (p. ej. archivos en ../convex o ../shared).
 config.watchFolders = [path.join(repoRoot, "convex"), path.join(repoRoot, "shared")];
 config.resolver.nodeModulesPaths = [path.join(__dirname, "node_modules")];
-module.exports = config;
+
+// NativeWind v5 (react-native-css): compila global.css en el pipeline de Metro.
+// - inlineVariables: false — los tokens quedan como variables CSS en runtime,
+//   igual que en la web (y evita romper PlatformColor si se usa en el futuro).
+// - globalClassNamePolyfill: false — usamos los wrappers de
+//   react-native-css/components en vez de parchear los primitivos de RN.
+module.exports = withNativewind(config, {
+  inlineVariables: false,
+  globalClassNamePolyfill: false,
+});

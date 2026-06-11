@@ -1,0 +1,93 @@
+/*
+ * Tokens "estadio nocturno" portados de src/index.css con los MISMOS nombres,
+ * para que las clases (bg-card, text-gold, border-border, …) sean idénticas a
+ * las de la web. La app nativa es tema único oscuro: los valores van en :root,
+ * sin variante dark. Las fuentes (--font-heading/--font-sans) llegan con la
+ * task de fuentes; las utilities web-only (.grain, .bg-pitch, …) se portan con
+ * piezas nativas en tasks posteriores.
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@layer theme {
+    @theme inline {
+        --color-chart-5: var(--chart-5);
+        --color-chart-4: var(--chart-4);
+        --color-chart-3: var(--chart-3);
+        --color-chart-2: var(--chart-2);
+        --color-chart-1: var(--chart-1);
+        --color-ring: var(--ring);
+        --color-input: var(--input);
+        --color-border: var(--border);
+        --color-destructive: var(--destructive);
+        --color-accent-foreground: var(--accent-foreground);
+        --color-accent: var(--accent);
+        --color-muted-foreground: var(--muted-foreground);
+        --color-muted: var(--muted);
+        --color-secondary-foreground: var(--secondary-foreground);
+        --color-secondary: var(--secondary);
+        --color-primary-foreground: var(--primary-foreground);
+        --color-primary: var(--primary);
+        --color-popover-foreground: var(--popover-foreground);
+        --color-popover: var(--popover);
+        --color-card-foreground: var(--card-foreground);
+        --color-card: var(--card);
+        --color-foreground: var(--foreground);
+        --color-background: var(--background);
+
+        /* festive accents */
+        --color-gold: var(--gold);
+        --color-gold-foreground: var(--gold-foreground);
+        --color-grass: var(--grass);
+        --color-alive: var(--alive);
+        --color-eliminated: var(--eliminated);
+
+        --radius-sm: calc(var(--radius) * 0.6);
+        --radius-md: calc(var(--radius) * 0.8);
+        --radius-lg: var(--radius);
+        --radius-xl: calc(var(--radius) * 1.4);
+        --radius-2xl: calc(var(--radius) * 1.8);
+        --radius-3xl: calc(var(--radius) * 2.2);
+        --radius-4xl: calc(var(--radius) * 2.6);
+    }
+}
+
+:root {
+    /* deep stadium-night greens with an indigo floodlight cast */
+    --background: oklch(0.205 0.034 168);
+    --foreground: oklch(0.97 0.012 150);
+    --card: oklch(0.255 0.036 166);
+    --card-foreground: oklch(0.97 0.012 150);
+    --popover: oklch(0.235 0.036 166);
+    --popover-foreground: oklch(0.97 0.012 150);
+
+    /* electric floodlight indigo as the action color */
+    --primary: oklch(0.66 0.19 268);
+    --primary-foreground: oklch(0.99 0.01 270);
+    --secondary: oklch(0.305 0.038 166);
+    --secondary-foreground: oklch(0.96 0.012 150);
+    --muted: oklch(0.305 0.03 166);
+    --muted-foreground: oklch(0.74 0.03 158);
+    --accent: oklch(0.33 0.05 174);
+    --accent-foreground: oklch(0.97 0.012 150);
+    --destructive: oklch(0.62 0.2 18);
+    --border: oklch(0.87 0.04 160 / 14%);
+    --input: oklch(0.9 0.03 160 / 16%);
+    --ring: oklch(0.66 0.19 268 / 70%);
+
+    --chart-1: oklch(0.75 0.16 150);
+    --chart-2: oklch(0.7 0.16 200);
+    --chart-3: oklch(0.66 0.19 268);
+    --chart-4: oklch(0.78 0.15 85);
+    --chart-5: oklch(0.62 0.2 18);
+
+    --radius: 0.85rem;
+
+    /* championship gold + state colors */
+    --gold: oklch(0.82 0.15 86);
+    --gold-foreground: oklch(0.28 0.06 80);
+    --grass: oklch(0.55 0.13 158);
+    --alive: oklch(0.78 0.16 150);
+    --eliminated: oklch(0.66 0.16 22);
+}
