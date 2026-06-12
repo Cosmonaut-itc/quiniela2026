@@ -43,10 +43,6 @@ describe("KNOWN_QUINIELAS_KEY", () => {
   it("solo contiene caracteres permitidos por SecureStore", () => {
     expect(KNOWN_QUINIELAS_KEY).toMatch(/^[A-Za-z0-9._-]+$/);
   });
-
-  it("no está vacío", () => {
-    expect(KNOWN_QUINIELAS_KEY.length).toBeGreaterThan(0);
-  });
 });
 
 describe("parseKnownQuinielas", () => {

@@ -16,7 +16,14 @@ export function storageKey(id: string, kind: TokenKind): string {
   return `quiniela:${id}:${kind}`;
 }
 
-/** Clave canónica saneada para SecureStore (solo [A-Za-z0-9._-]; lo demás → "_"). */
+/**
+ * Clave canónica saneada para SecureStore (solo [A-Za-z0-9._-]; lo demás → "_").
+ *
+ * El saneado no es inyectivo en general (`a:b` y `a_b` colisionarían), pero en
+ * la práctica no hay colisiones: los ids de Convex son alfanuméricos en minúsculas,
+ * por lo que la única sustitución real es `:` → `_`, y los separadores de la clave
+ * canónica son siempre `:`, así que el patrón `quiniela_<id>_<kind>` es único.
+ */
 export function secureStoreKey(id: string, kind: TokenKind): string {
   return storageKey(id, kind).replace(/[^A-Za-z0-9._-]/g, "_");
 }
