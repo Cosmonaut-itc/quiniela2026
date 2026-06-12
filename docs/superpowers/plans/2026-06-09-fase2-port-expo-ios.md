@@ -1,5 +1,11 @@
 # Fase 2: Port a Expo iOS — Implementation Plan
 
+> **⚠️ Enmienda (2026-06-11, SEN-23):** el engine de estilos es **Uniwind**, NO
+> NativeWind v5/react-native-css como dice el cuerpo de este plan (Tasks 3-4 ya
+> ejecutadas; ver `docs/adr/0003` y los invariantes en `native/metro.config.js`).
+> Toda mención a NativeWind/react-native-css en las tasks restantes se lee como
+> Uniwind; la skill `expo:expo-tailwind-setup` ya no aplica.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
 > **Prerequisito:** Fase 1 (multi-torneo) fusionada y desplegada. Este plan asume el schema/queries post-Fase 1 (`getTorneo`, `tournaments.list`, `currentRonda`, etc.).
