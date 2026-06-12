@@ -178,6 +178,11 @@
  */
 @layer theme {
     :root {
+        /* El teal del --accent web, con nombre propio: dentro de las variantes
+           --accent ya significa acción (var(--primary)), así que los usos del
+           teal referencian este helper en vez de duplicar el literal. */
+        --accent-teal: oklch(0.33 0.05 174);
+
         @variant light {
             /* base — literales: el mismo nombre existe en :root y un var()
                aquí sería autorreferencia */
@@ -192,7 +197,7 @@
             --surface-foreground: var(--card-foreground);
             --surface-secondary: var(--secondary);
             --surface-secondary-foreground: var(--secondary-foreground);
-            --surface-tertiary: oklch(0.33 0.05 174); /* --accent web (teal) */
+            --surface-tertiary: var(--accent-teal);
             --surface-tertiary-foreground: var(--foreground);
             --overlay: var(--popover);
             --overlay-foreground: var(--popover-foreground);
@@ -223,7 +228,7 @@
             --danger-foreground: var(--foreground);
 
             /* segmented control: thumb en el teal web, un paso sobre --default */
-            --segment: oklch(0.33 0.05 174);
+            --segment: var(--accent-teal);
             --segment-foreground: var(--foreground);
 
             /* misc */
@@ -249,7 +254,7 @@
             --surface-foreground: var(--card-foreground);
             --surface-secondary: var(--secondary);
             --surface-secondary-foreground: var(--secondary-foreground);
-            --surface-tertiary: oklch(0.33 0.05 174);
+            --surface-tertiary: var(--accent-teal);
             --surface-tertiary-foreground: var(--foreground);
             --overlay: var(--popover);
             --overlay-foreground: var(--popover-foreground);
@@ -274,7 +279,7 @@
             --danger: var(--destructive);
             --danger-foreground: var(--foreground);
 
-            --segment: oklch(0.33 0.05 174);
+            --segment: var(--accent-teal);
             --segment-foreground: var(--foreground);
 
             --separator: var(--border);
