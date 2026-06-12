@@ -1,15 +1,27 @@
 // Vista mínima read-only del panel personal Progol (espejo de
 // src/routes/progol/ProgolPersonal.tsx). SEN-26 la reemplaza por el port real.
 import { useQuery } from "convex/react";
+import { useEffect } from "react";
 import { Text } from "react-native";
 import { api } from "@convex/_generated/api";
 import { GrainCard } from "@/components/Grain";
 import { Cargando, Pantalla } from "@/components/Pantalla";
+import { setToken } from "@/lib/storage";
 
 type Props = { quinielaId: string; personalToken: string };
 
-export function ProgolPersonal({ personalToken }: Props) {
+export function ProgolPersonal({ quinielaId, personalToken }: Props) {
   const data = useQuery(api.progol.getPersonal, { personalToken });
+
+  // Espejo del effect del BottomNav web (Shell.tsx): persistir el token
+  // personal al montar, solo cuando la query resolvió — un token inválido no
+  // se persiste (en la web el BottomNav solo monta en éxito).
+  const loaded = data !== undefined;
+  useEffect(() => {
+    if (!loaded) return;
+    void setToken(quinielaId, "me", personalToken);
+  }, [loaded, quinielaId, personalToken]);
+
   if (data === undefined) return <Cargando />;
 
   const { who } = data;
