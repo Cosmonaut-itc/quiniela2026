@@ -2,8 +2,15 @@
 // (espejo del Dialog de src/routes/Join.tsx / ProgolGeneral.tsx, sin foto:
 // las fotos llegan con SEN-25). Presentacional: el submit real (mutación +
 // persistencia de token + navegación) lo inyecta cada vista vía `alUnirse`;
-// aquí solo viven nombre/busy/error y el try/finally que resetea busy
-// (mismo patrón que el submit() web).
+// aquí solo viven nombre/busy/error.
+//
+// DIVERGENCIA vs. la web: la web usa try/finally para resetear busy porque
+// react-router desmonta la pantalla en el mismo flush que router.navigate().
+// Aquí la pantalla nativa sobrevive a la transición de router.replace(), por
+// lo que un finally reactivaría el botón y permitiría un segundo tap antes de
+// que el screen sea destruido (joinQuiniela no es idempotente y consumiría un
+// lugar extra). Solución: busy solo se resetea en el catch; en éxito se deja
+// en true para que "Entrando…" persista durante toda la transición de salida.
 import { Button, Input, Label, TextField } from "heroui-native";
 import { useState } from "react";
 import { Text, View } from "react-native";
@@ -26,11 +33,14 @@ export function FormularioUnirse({ titulo, alUnirse }: Props) {
     setError(null);
     try {
       await alUnirse(nombre);
-    } catch {
+      // Éxito: NO reseteamos busy. Ver comentario de módulo sobre la
+      // divergencia con la web y el riesgo de doble-tap en nativo.
+    } catch (err) {
       // Feedback mínimo: el mensaje crudo de Convex trae request id y stack,
       // no es apto para UI. El detalle fino llega con SEN-25/26.
+      // console.warn para diagnóstico hasta que SEN-25/26 traiga UI de error.
+      console.warn("[FormularioUnirse] error al unirse:", err);
       setError("No se pudo completar la inscripción. Intenta de nuevo.");
-    } finally {
       setBusy(false);
     }
   }
@@ -40,7 +50,9 @@ export function FormularioUnirse({ titulo, alUnirse }: Props) {
       <Text className="font-sans font-bold text-base text-foreground">
         {titulo}
       </Text>
-      <TextField className="mt-3">
+      {/* isInvalid activa el estado visual temático de HeroUI; el texto de
+          error debajo lo hace legible también sin color (accesibilidad). */}
+      <TextField className="mt-3" isInvalid={!!error}>
         <Label>Tu nombre</Label>
         <Input
           value={nombre}

@@ -19,18 +19,32 @@ export function ProgolGeneral({ quinielaId, joinToken }: Props) {
   const join = useMutation(api.participants.joinQuiniela);
 
   // "Ya inscrito en este dispositivo" = existe token "me" en Keychain (espejo
-  // del readStoredToken síncrono de la web). undefined = lectura en curso:
-  // mientras tanto se omite la sección CTA para no parpadear el form.
-  const [meToken, setMeToken] = useState<string | null | undefined>(undefined);
+  // del readStoredToken síncrono de la web).
+  //
+  // Estado derivado: guardamos la lectura como { id, token } para atar el
+  // resultado a la quinielaId que lo generó. Si quinielaId cambia (p. ej. por
+  // un deep link que pushea una instancia nueva), meToken se recalcula a
+  // undefined (= pendiente) en lugar de mostrar el token de la quiniela
+  // anterior. ESLint prohíbe setState síncrono en effects, por eso no
+  // reseteamos el state dentro del effect al cambiar quinielaId; en su lugar
+  // la derivación lo hace sin efecto secundario.
+  //
+  // Tri-estado: undefined = lectura en curso (se oculta el CTA para evitar
+  // parpadeo); null = no hay token; string = ya inscrito.
+  const [lectura, setLectura] = useState<
+    { id: string; token: string | null } | undefined
+  >(undefined);
   useEffect(() => {
     let activo = true;
     void getToken(quinielaId, "me").then((t) => {
-      if (activo) setMeToken(t);
+      if (activo) setLectura({ id: quinielaId, token: t });
     });
     return () => {
       activo = false;
     };
   }, [quinielaId]);
+  // Derivado: solo se usa el token si pertenece a la quinielaId actual.
+  const meToken = lectura?.id === quinielaId ? lectura.token : undefined;
 
   // Espejo del effect del BottomNav web (Shell.tsx): persistir el join token,
   // pero solo cuando la query resolvió — un token inválido no se persiste
