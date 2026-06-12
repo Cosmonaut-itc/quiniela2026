@@ -10,10 +10,12 @@ export function Pantalla({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
     <View className="flex-1 bg-background">
+      {/* sin esto el primer tap con teclado abierto solo cierra el teclado y se traga el press del botón (afecta FormularioUnirse y el rescate del home) */}
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-4 pb-10"
         contentContainerStyle={{ paddingTop: insets.top + 24 }}
+        keyboardShouldPersistTaps="handled"
       >
         {children}
       </ScrollView>

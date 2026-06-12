@@ -10,7 +10,7 @@ import { Button, Input, Label, TextField } from "heroui-native";
 import { useCallback, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { parsePersonalPanelPath } from "@shared/personalLink";
-import { Cargando, Pantalla } from "@/components/Pantalla";
+import { Pantalla } from "@/components/Pantalla";
 import { getToken, listKnownQuinielas } from "@/lib/storage";
 
 // Reexportar ErrorBoundary para uniformidad con las demás rutas del proyecto.
@@ -31,6 +31,9 @@ export default function Index() {
 
   // Re-lee storage en cada focus (no solo en mount): si el usuario entró a una
   // quiniela via deep link y volvió aquí, el nuevo token ya debe aparecer.
+  // Tradeoff aceptado: `cargado` nunca se resetea, así que filas obsoletas
+  // permanecen visibles durante la relectura (preferible al flash de "Cargando"
+  // en cada focus).
   useFocusEffect(
     useCallback(() => {
       let activo = true;
@@ -56,7 +59,9 @@ export default function Index() {
             (e): e is { id: string; token: string } => e !== null,
           ),
         });
-      });
+      // los helpers de storage documentan que no rechazan; el catch protege
+      // ediciones futuras del chain de un unhandled rejection silencioso.
+      }).catch((err: unknown) => console.warn("[home] storage chain error", err));
 
       return () => {
         activo = false;
@@ -113,6 +118,10 @@ export default function Index() {
                 <Pressable
                   key={panel.id}
                   className="flex-row items-center justify-between rounded-2xl border border-border bg-card px-4 py-3.5 active:opacity-70"
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    sufijo ? `${etiqueta} ${sufijo}` : etiqueta
+                  }
                   onPress={() =>
                     router.push({
                       pathname: "/q/[id]/me/[token]",
@@ -141,7 +150,11 @@ export default function Index() {
       )}
 
       {/* Estado vacío — cuando el storage ya cargó y no hay paneles */}
-      {!estado.cargado && <Cargando />}
+      {!estado.cargado && (
+        <Text className="mt-4 font-sans text-sm text-muted-foreground">
+          Cargando…
+        </Text>
+      )}
       {estado.cargado && estado.paneles.length === 0 && (
         <Text className="mt-4 font-sans text-sm text-muted-foreground">
           Abre el link de tu quiniela para entrar; tu panel quedará guardado
