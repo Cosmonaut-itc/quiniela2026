@@ -3,6 +3,8 @@
 import { useLocalSearchParams } from "expo-router";
 import { VistaTorneo } from "@/components/views/VistaTorneo";
 
+export { ErrorBoundary } from "expo-router";
+
 export default function TorneoRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   return <VistaTorneo quinielaId={id} />;

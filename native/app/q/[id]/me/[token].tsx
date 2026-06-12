@@ -8,10 +8,12 @@ import { Cargando } from "@/components/Pantalla";
 import { PersonalClasica } from "@/components/views/PersonalClasica";
 import { ProgolPersonal } from "@/components/views/ProgolPersonal";
 
+export { ErrorBoundary } from "expo-router";
+
 export default function PersonalRoute() {
   const { id, token } = useLocalSearchParams<{ id: string; token: string }>();
   const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
-  if (!mode) return <Cargando />;
+  if (mode === undefined) return <Cargando />;
   return mode.gameMode === "progol" ? (
     <ProgolPersonal quinielaId={id} personalToken={token} />
   ) : (

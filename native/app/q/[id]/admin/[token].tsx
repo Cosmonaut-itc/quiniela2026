@@ -8,10 +8,12 @@ import { Cargando } from "@/components/Pantalla";
 import { AdminClasica } from "@/components/views/AdminClasica";
 import { ProgolAdmin } from "@/components/views/ProgolAdmin";
 
+export { ErrorBoundary } from "expo-router";
+
 export default function AdminRoute() {
   const { id, token } = useLocalSearchParams<{ id: string; token: string }>();
   const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
-  if (!mode) return <Cargando />;
+  if (mode === undefined) return <Cargando />;
   return mode.gameMode === "progol" ? (
     <ProgolAdmin quinielaId={id} adminToken={token} />
   ) : (

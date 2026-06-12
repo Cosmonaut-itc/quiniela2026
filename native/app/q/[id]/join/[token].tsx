@@ -8,10 +8,15 @@ import { Cargando } from "@/components/Pantalla";
 import { JoinClasica } from "@/components/views/JoinClasica";
 import { ProgolGeneral } from "@/components/views/ProgolGeneral";
 
+// Token inválido/revocado → la query de Convex lanza un error en servidor;
+// sin ErrorBoundary expo-router lo propaga al handler global de RN y mata la app
+// en producción. La versión tematizada del boundary llega con SEN-25/26.
+export { ErrorBoundary } from "expo-router";
+
 export default function JoinRoute() {
   const { id, token } = useLocalSearchParams<{ id: string; token: string }>();
   const mode = useQuery(api.quinielas.getMode, { id: id as Id<"quinielas"> });
-  if (!mode) return <Cargando />;
+  if (mode === undefined) return <Cargando />;
   return mode.gameMode === "progol" ? (
     <ProgolGeneral quinielaId={id} joinToken={token} />
   ) : (
