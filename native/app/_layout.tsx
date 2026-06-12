@@ -14,7 +14,9 @@ import { ConvexProvider } from "convex/react";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { HeroUINativeProvider } from "heroui-native";
 import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { convex } from "@/lib/convex";
 
 // A nivel módulo (no dentro del componente, llegaría tarde): mantiene visible
@@ -49,8 +51,16 @@ export default function RootLayout() {
   }
 
   return (
-    <ConvexProvider client={convex}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0d1f1a" } }} />
-    </ConvexProvider>
+    // GestureHandlerRootView: lo exige el setup de HeroUI Native (toasts
+    // swipeables, drag-to-dismiss del Dialog). HeroUINativeProvider monta
+    // ToastProvider + PortalHost (overlays) y sincroniza los safe-area insets
+    // con Uniwind; va pegado al árbol de UI, dentro de ConvexProvider.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ConvexProvider client={convex}>
+        <HeroUINativeProvider>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0d1f1a" } }} />
+        </HeroUINativeProvider>
+      </ConvexProvider>
+    </GestureHandlerRootView>
   );
 }

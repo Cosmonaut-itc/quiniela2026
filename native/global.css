@@ -2,15 +2,32 @@
  * Tokens "estadio nocturno" portados de src/index.css con los MISMOS nombres,
  * para que las clases (bg-card, text-gold, border-border, …) sean idénticas a
  * las de la web. La app nativa es tema único oscuro: los valores van en :root,
- * sin variante dark. Las utilities web-only (.grain, .bg-pitch, …) se portan
- * con piezas nativas en tasks posteriores; los tokens --sidebar-* se omiten
- * porque el sidebar es web-only.
+ * sin variante dark (las variantes light/dark que trae heroui-native se pisan
+ * al final de este archivo). Las utilities web-only (.grain, .bg-pitch, …) se
+ * portan con piezas nativas en tasks posteriores; los tokens --sidebar-* se
+ * omiten porque el sidebar es web-only.
  */
 @import "tailwindcss";
 @import "uniwind";
+/* Trae @theme base (--radius 0.5rem, --white/--eclipse…), bloques @variant
+   light/dark con sus tokens y @theme inline static con los --color- y --radius-
+   calculados. Nuestros bloques de abajo van DESPUÉS para ganar la cascada. */
+@import "heroui-native/styles";
+
+/* Tailwind no escanea node_modules por default: sin esto, las clases que solo
+   usan los componentes de heroui-native (bg-overlay, text-muted, …) no se
+   compilan al stylesheet de uniwind y salen sin estilo. */
+@source "./node_modules/heroui-native/lib";
 
 @layer theme {
-    @theme inline {
+    /*
+     * "static" es obligatorio: heroui-native lee --color-* al runtime vía
+     * useThemeColor → useCSSVariable (p. ej. --color-muted para iconos). Sin
+     * static, nuestra redefinición de --color-muted/--color-foreground/… pisa
+     * el "@theme inline static" de heroui y el var se inlinea en las utilities
+     * sin emitirse como variable runtime → useThemeColor devuelve "invalid".
+     */
+    @theme inline static {
         /*
          * Tipografía: el NOMBRE del token es el de la web (font-heading /
          * font-sans) pero el valor es el nombre de familia REAL del TTF, sin
@@ -25,6 +42,28 @@
          */
         --font-heading: "Bricolage Grotesque";
         --font-sans: "Sora";
+
+        /*
+         * Fuente de los componentes HeroUI: sus <Text> internos usan las
+         * clases font-normal/font-medium/font-semibold. Su mecanismo oficial
+         * de theming es definir --font-{normal,medium,semibold} como FAMILIAS,
+         * lo que convierte esas utilities de PESO en utilities de FAMILIA
+         * apuntando a la cara exacta que registró useFonts (_layout.tsx).
+         * Consecuencia global: esas tres clases ya no ponen font-weight; como
+         * uniwind resuelve por orden de className (la última clase gana por
+         * propiedad), "font-sans font-medium" sigue viéndose Sora 500 porque
+         * font-medium pisa la familia con la cara Medium. font-bold queda SIN
+         * mapear a propósito: sigue siendo peso (700) para que "font-heading
+         * font-bold" renderice Bricolage Bold; los pocos font-bold internos de
+         * HeroUI caen al font del sistema en bold.
+         * OJO al portar: las recetas web "font-heading font-medium" (DialogTitle,
+         * CardTitle) y "font-heading font-semibold" (Leaderboard, PlayerRow,
+         * Admin) perderían Bricolage en silencio — adaptarlas a font-bold/
+         * font-extrabold o a [font-weight:500|600].
+         */
+        --font-normal: "Sora_400Regular";
+        --font-medium: "Sora_500Medium";
+        --font-semibold: "Sora_600SemiBold";
 
         --color-chart-5: var(--chart-5);
         --color-chart-4: var(--chart-4);
@@ -104,4 +143,147 @@
     --grass: oklch(0.55 0.13 158);
     --alive: oklch(0.78 0.16 150);
     --eliminated: oklch(0.66 0.16 22);
+}
+
+/*
+ * HeroUI Native → estadio nocturno, tema único oscuro.
+ *
+ * heroui-native/styles define sus tokens en @variant light/@variant dark, y en
+ * uniwind las variables con scope de tema GANAN sobre las de :root: sin este
+ * bloque, su dark zinc pisaría nuestro --background/--accent/--muted de arriba.
+ * Se redeclaran aquí TODOS sus tokens de variante (y los nombres que chocan
+ * con :root) DESPUÉS de su import para ganar la cascada, con el MISMO valor en
+ * light y en dark: gane la variante que gane (app.json fija
+ * userInterfaceStyle=dark; light solo activaría si el SO lo ignorara), siempre
+ * se ve el estadio. Su dialecto difiere del nuestro; mapeo:
+ *   --accent (su color de ACCIÓN)  → var(--primary)        (indigo)
+ *   --surface*                     → --card / --secondary
+ *   --overlay                      → --popover
+ *   --muted (en su dialecto es un FOREGROUND) → var(--muted-foreground)
+ *   --danger                       → var(--destructive)
+ *   --default (botón/chip neutro)  → var(--secondary)
+ * El --accent web (teal sutil, oklch(0.33 0.05 174)) queda reubicado como
+ * literal en --surface-tertiary y --segment: en native "accent" pasa a
+ * significar acción. Ojo para ports: bg-accent ya NO es el teal de la web
+ * (usar bg-secondary o el literal) y bg-muted es claro, no oscuro.
+ *
+ * Al subir heroui-native: diff de
+ * node_modules/heroui-native/lib/module/styles/variables.css contra este
+ * bloque — todo token de variante NUEVO se redeclara aquí en AMBAS variantes,
+ * o su zinc gana en silencio.
+ *
+ * Toasts en los ports: toast.show SOLO desde event handlers, nunca en effects
+ * con dep [toast] — su provider recrea show con cada toast y el effect entra
+ * en loop (verificado contra su providers/toast/provider.js).
+ */
+@layer theme {
+    :root {
+        @variant light {
+            /* base — literales: el mismo nombre existe en :root y un var()
+               aquí sería autorreferencia */
+            --background: oklch(0.205 0.034 168); /* = --background de :root */
+            --foreground: oklch(0.97 0.012 150); /* = --foreground de :root */
+            --border: oklch(0.87 0.04 160 / 14%); /* = --border de :root */
+            --radius: 0.85rem; /* = --radius de :root; pisa su 0.5rem para que
+               sus --radius-field/--radius-* calculados escalen al estadio */
+
+            /* superficies (cards, accordions) y overlays (dialogs, menus) */
+            --surface: var(--card);
+            --surface-foreground: var(--card-foreground);
+            --surface-secondary: var(--secondary);
+            --surface-secondary-foreground: var(--secondary-foreground);
+            --surface-tertiary: oklch(0.33 0.05 174); /* --accent web (teal) */
+            --surface-tertiary-foreground: var(--foreground);
+            --overlay: var(--popover);
+            --overlay-foreground: var(--popover-foreground);
+            --backdrop: oklch(0 0 0 / 40%); /* web: bg-black/10 + blur; sin
+               backdrop-blur nativo se compensa con más opacidad */
+
+            /* foregrounds y neutros */
+            --muted: var(--muted-foreground);
+            --default: var(--secondary);
+            --default-foreground: var(--secondary-foreground);
+
+            /* acción */
+            --accent: var(--primary);
+            --accent-foreground: var(--primary-foreground);
+
+            /* form fields (su --field-border-width es 0: el borde no pinta) */
+            --field-background: var(--secondary);
+            --field-foreground: var(--foreground);
+            --field-placeholder: var(--muted-foreground);
+            --field-border: var(--input);
+
+            /* estados: success=verde "alive", warning=oro del campeonato */
+            --success: var(--alive);
+            --success-foreground: var(--background);
+            --warning: var(--gold);
+            --warning-foreground: var(--gold-foreground);
+            --danger: var(--destructive);
+            --danger-foreground: var(--foreground);
+
+            /* segmented control: thumb en el teal web, un paso sobre --default */
+            --segment: oklch(0.33 0.05 174);
+            --segment-foreground: var(--foreground);
+
+            /* misc */
+            --separator: var(--border);
+            --focus: var(--ring);
+            --link: var(--primary);
+
+            /* sombras: las de su tema dark (plano en superficies, halo blanco
+               sutil en overlays) */
+            --surface-shadow: 0 0 0 0 transparent inset;
+            --overlay-shadow: 0 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+            --field-shadow: 0 0 0 0 transparent inset;
+        }
+
+        /* idéntico a @variant light: tema único (ver comentario de arriba) */
+        @variant dark {
+            --background: oklch(0.205 0.034 168);
+            --foreground: oklch(0.97 0.012 150);
+            --border: oklch(0.87 0.04 160 / 14%);
+            --radius: 0.85rem;
+
+            --surface: var(--card);
+            --surface-foreground: var(--card-foreground);
+            --surface-secondary: var(--secondary);
+            --surface-secondary-foreground: var(--secondary-foreground);
+            --surface-tertiary: oklch(0.33 0.05 174);
+            --surface-tertiary-foreground: var(--foreground);
+            --overlay: var(--popover);
+            --overlay-foreground: var(--popover-foreground);
+            --backdrop: oklch(0 0 0 / 40%);
+
+            --muted: var(--muted-foreground);
+            --default: var(--secondary);
+            --default-foreground: var(--secondary-foreground);
+
+            --accent: var(--primary);
+            --accent-foreground: var(--primary-foreground);
+
+            --field-background: var(--secondary);
+            --field-foreground: var(--foreground);
+            --field-placeholder: var(--muted-foreground);
+            --field-border: var(--input);
+
+            --success: var(--alive);
+            --success-foreground: var(--background);
+            --warning: var(--gold);
+            --warning-foreground: var(--gold-foreground);
+            --danger: var(--destructive);
+            --danger-foreground: var(--foreground);
+
+            --segment: oklch(0.33 0.05 174);
+            --segment-foreground: var(--foreground);
+
+            --separator: var(--border);
+            --focus: var(--ring);
+            --link: var(--primary);
+
+            --surface-shadow: 0 0 0 0 transparent inset;
+            --overlay-shadow: 0 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+            --field-shadow: 0 0 0 0 transparent inset;
+        }
+    }
 }
