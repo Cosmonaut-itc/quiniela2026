@@ -115,3 +115,36 @@ export function matchLiveFixture(match: LiveMatchKey, fixtures: LiveFixture[]): 
     ) ?? null
   );
 }
+
+const BASE = "https://v3.football.api-sports.io";
+const MAX_RETRY_WAIT_MS = 60_000;
+const DEFAULT_BACKOFF_MS = 1_000;
+
+function retryAfterMs(header: string | null | undefined): number {
+  const secs = Number(header);
+  if (!Number.isFinite(secs) || secs <= 0) return DEFAULT_BACKOFF_MS;
+  return Math.min(Math.ceil(secs) * 1000, MAX_RETRY_WAIT_MS);
+}
+
+type FetchDeps = { fetchFn?: typeof fetch; sleep?: (ms: number) => Promise<void> };
+
+async function fetchJson(url: string, token: string, deps: FetchDeps): Promise<unknown> {
+  const fetchFn = deps.fetchFn ?? fetch;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const request = () => fetchFn(url, { headers: { "x-apisports-key": token } });
+  let res = await request();
+  if (res.status === 429) {
+    await sleep(retryAfterMs(res.headers.get("Retry-After")));
+    res = await request();
+  }
+  if (!res.ok) throw new Error(`api-football ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLiveFixtures(token: string, deps: FetchDeps = {}): Promise<LiveFixture[]> {
+  return mapLiveFixtures((await fetchJson(`${BASE}/fixtures?live=all`, token, deps)) as { response?: RawFixture[] });
+}
+
+export async function fetchLineups(token: string, fixtureId: number, deps: FetchDeps = {}): Promise<MappedTeamLineup[]> {
+  return mapLineups((await fetchJson(`${BASE}/fixtures/lineups?fixture=${fixtureId}`, token, deps)) as { response?: RawLineupTeam[] });
+}

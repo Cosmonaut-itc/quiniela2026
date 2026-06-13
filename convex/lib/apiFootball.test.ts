@@ -4,6 +4,8 @@ import {
   mapLiveFixtures, mapLineups, orientLineups, isConfirmed,
 } from "./apiFootball";
 import { matchLiveFixture } from "./apiFootball";
+import { fetchLiveFixtures, fetchLineups } from "./apiFootball";
+import { vi } from "vitest";
 
 describe("normalizeTeamName", () => {
   it("baja a minúsculas, quita acentos, puntuación y sufijos de club", () => {
@@ -92,5 +94,42 @@ describe("matchLiveFixture", () => {
   });
   it("devuelve null si no hay coincidencia", () => {
     expect(matchLiveFixture({ homeName: "Sevilla", awayName: "Betis", apiFixtureId: null }, fixtures)).toBeNull();
+  });
+});
+
+function fakeRes(opts: { status: number; retryAfter?: string | null; body?: unknown }) {
+  return {
+    ok: opts.status >= 200 && opts.status < 300,
+    status: opts.status,
+    headers: { get: (h: string) => (h === "Retry-After" ? opts.retryAfter ?? null : null) },
+    json: async () => opts.body ?? { response: [] },
+  } as unknown as Response;
+}
+
+describe("fetchLiveFixtures / fetchLineups", () => {
+  it("manda el header x-apisports-key y mapea la respuesta", async () => {
+    const fetchFn = vi.fn(async () => fakeRes({ status: 200, body: {
+      response: [{ fixture: { id: 7 }, teams: { home: { id: 1, name: "A" }, away: { id: 2, name: "B" } } }],
+    } }));
+    const out = await fetchLiveFixtures("KEY", { fetchFn });
+    expect(out[0].fixtureId).toBe(7);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(String(url)).toContain("/fixtures?live=all");
+    expect((init as RequestInit).headers).toMatchObject({ "x-apisports-key": "KEY" });
+  });
+
+  it("reintenta una vez tras 429 respetando Retry-After", async () => {
+    const sleep = vi.fn(async () => {});
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce(fakeRes({ status: 429, retryAfter: "1" }))
+      .mockResolvedValueOnce(fakeRes({ status: 200, body: { response: [] } }));
+    await fetchLineups("KEY", 7, { fetchFn, sleep });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(1000);
+  });
+
+  it("lanza si la respuesta no es ok", async () => {
+    const fetchFn = vi.fn(async () => fakeRes({ status: 500 }));
+    await expect(fetchLineups("KEY", 7, { fetchFn })).rejects.toThrow("api-football 500");
   });
 });
