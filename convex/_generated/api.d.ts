@@ -21,6 +21,7 @@ import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
 import type * as lib_tournaments from "../lib/tournaments.js";
 import type * as lib_view from "../lib/view.js";
+import type * as lineups from "../lineups.js";
 import type * as matches from "../matches.js";
 import type * as migrations from "../migrations.js";
 import type * as mundial from "../mundial.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tournament": typeof lib_tournament;
   "lib/tournaments": typeof lib_tournaments;
   "lib/view": typeof lib_view;
+  lineups: typeof lineups;
   matches: typeof matches;
   migrations: typeof migrations;
   mundial: typeof mundial;

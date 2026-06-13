@@ -88,3 +88,71 @@ describe("liveMatchesNeedingLineup", () => {
     expect(out.find((x) => x.matchId === matchId)).toBeUndefined();
   });
 });
+
+import { runLineupSync } from "./lineups";
+import { vi } from "vitest";
+
+const fx = (id: number, h: string, a: string) => ({ fixtureId: id, homeApiId: id * 10, awayApiId: id * 10 + 1, homeName: h, awayName: a });
+const teamLineup = (apiTeamId: number, name: string, xi: number) => ({
+  apiTeamId, name, formation: "4-3-3", coach: "C",
+  startXI: Array.from({ length: xi }, (_, i) => ({ name: `p${i}` })), bench: [],
+});
+
+describe("runLineupSync", () => {
+  it("sin partidos en vivo no hace NINGUNA llamada", async () => {
+    const fetchLive = vi.fn();
+    const fetchOne = vi.fn();
+    const upsert = vi.fn();
+    await runLineupSync([], { fetchLive, fetchOne, upsert });
+    expect(fetchLive).not.toHaveBeenCalled();
+    expect(fetchOne).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("una sola llamada live=all y un upsert por partido reconciliado", async () => {
+    const fetchLive = vi.fn(async () => [fx(1, "Alpha", "Beta")]);
+    const fetchOne = vi.fn(async () => [teamLineup(11, "Beta", 11), teamLineup(10, "Alpha", 11)]);
+    const upsert = vi.fn(async () => {});
+    await runLineupSync(
+      [{ matchId: "m1", tournamentCode: "WC", homeName: "Alpha", awayName: "Beta", apiFixtureId: null, confirmed: false }],
+      { fetchLive, fetchOne, upsert },
+    );
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(fetchOne).toHaveBeenCalledWith(1);
+    const arg = upsert.mock.calls[0][0];
+    expect(arg).toMatchObject({ matchId: "m1", apiFixtureId: 1, confirmed: true });
+    expect(arg.home.name).toBe("Alpha"); // orientado por id del fixture
+  });
+
+  it("salta el partido sin fixture reconciliado (no llama a fetchOne)", async () => {
+    const fetchLive = vi.fn(async () => [fx(1, "Otro", "Equipo")]);
+    const fetchOne = vi.fn();
+    const upsert = vi.fn();
+    await runLineupSync(
+      [{ matchId: "m1", tournamentCode: "WC", homeName: "Alpha", awayName: "Beta", apiFixtureId: null, confirmed: false }],
+      { fetchLive, fetchOne, upsert },
+    );
+    expect(fetchOne).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("un fallo en un partido no aborta el resto", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchLive = vi.fn(async () => [fx(1, "Alpha", "Beta"), fx(2, "Gamma", "Delta")]);
+    const fetchOne = vi.fn(async (id: number) => {
+      if (id === 1) throw new Error("boom");
+      return [teamLineup(20, "Gamma", 11), teamLineup(21, "Delta", 11)];
+    });
+    const upsert = vi.fn(async () => {});
+    await runLineupSync(
+      [
+        { matchId: "m1", tournamentCode: "WC", homeName: "Alpha", awayName: "Beta", apiFixtureId: null, confirmed: false },
+        { matchId: "m2", tournamentCode: "WC", homeName: "Gamma", awayName: "Delta", apiFixtureId: null, confirmed: false },
+      ],
+      { fetchLive, fetchOne, upsert },
+    );
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert.mock.calls[0][0].matchId).toBe("m2");
+    errorSpy.mockRestore();
+  });
+});
