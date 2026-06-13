@@ -1,0 +1,22 @@
+# SEN-24 · Unirse a una quiniela clásica vía deep link.
+# Corre contra Expo Go con el backend dev sembrado (una quiniela clásica
+# `status: "open"` con lugares libres). Inyecta sus datos por env:
+#   maestro test \
+#     -e QUINIELA_ID=<id> -e JOIN_TOKEN=<joinToken> \
+#     native/.maestro/sen24-unirse-desde-deeplink.yaml
+# (joinToken = 2º hash en `npx convex data quinielas`.)
+appId: host.exp.Exponent
+---
+- openLink: exp://127.0.0.1:8081/--/q/${QUINIELA_ID}/join/${JOIN_TOKEN}
+- extendedWaitUntil:
+    visible: ".*Unirme a la quiniela.*"
+    timeout: 30000
+- assertVisible: "Tu nombre"
+- tapOn: "Ej. María"
+- inputText: "Maestro SEN24"
+- tapOn: ".*Confirmar inscripción.*"
+# Aterrizaje en Mi panel = inscripción OK + token personal persistido + nav.
+- extendedWaitUntil:
+    visible: "Mi estado"
+    timeout: 30000
+- assertVisible: "Maestro SEN24"

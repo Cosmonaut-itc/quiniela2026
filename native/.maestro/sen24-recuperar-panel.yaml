@@ -1,0 +1,19 @@
+# SEN-24 · Reabrir la app SIN link recupera el panel desde SecureStore.
+# Prueba conductual de persistencia: requiere haber corrido antes
+# sen24-unirse-desde-deeplink.yaml en este mismo dispositivo (el token y el
+# registro de quinielas conocidas viven en el Keychain de Expo Go). Termina la
+# app y abre la URL raíz del proyecto (home, sin deep link); el panel guardado
+# debe aparecer y navegar a Mi panel.
+appId: host.exp.Exponent
+---
+- stopApp
+- openLink: exp://127.0.0.1:8081
+- extendedWaitUntil:
+    visible: "Quiniela 2026"
+    timeout: 30000
+- assertVisible: ".*Continuar a Mi panel.*"
+- tapOn: ".*Continuar a Mi panel.*"
+- extendedWaitUntil:
+    visible: "Mi estado"
+    timeout: 30000
+- assertVisible: "Maestro SEN24"

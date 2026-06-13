@@ -1,0 +1,36 @@
+# SEN-24 · Rescate "pega tu link o token" en el home (parser compartido con la
+# web, shared/personalLink.ts). Dos variantes: ruta personal completa y token
+# suelto (resoluble porque hay exactamente 1 quiniela conocida en el registro).
+# Inyecta el id y el token personal del inscrito por env:
+#   maestro test \
+#     -e QUINIELA_ID=<id> -e PERSONAL_TOKEN=<personalToken> \
+#     native/.maestro/sen24-rescate-link-o-token.yaml
+# (personalToken = columna `personalToken` en `npx convex data participants`.)
+appId: host.exp.Exponent
+---
+# --- Variante A: ruta personal completa /q/<id>/me/<token> ---
+- stopApp
+- openLink: exp://127.0.0.1:8081
+- extendedWaitUntil:
+    visible: "Tu link o token"
+    timeout: 30000
+- tapOn: "https://.*me.*"
+- inputText: "/q/${QUINIELA_ID}/me/${PERSONAL_TOKEN}"
+- tapOn: "Recuperar mi panel"
+- extendedWaitUntil:
+    visible: "Mi estado"
+    timeout: 30000
+- assertVisible: "Maestro SEN24"
+# --- Variante B: token suelto (fallbackId = única quiniela conocida) ---
+- stopApp
+- openLink: exp://127.0.0.1:8081
+- extendedWaitUntil:
+    visible: "Tu link o token"
+    timeout: 30000
+- tapOn: "https://.*me.*"
+- inputText: "${PERSONAL_TOKEN}"
+- tapOn: "Recuperar mi panel"
+- extendedWaitUntil:
+    visible: "Mi estado"
+    timeout: 30000
+- assertVisible: "Maestro SEN24"
