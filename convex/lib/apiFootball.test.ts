@@ -3,6 +3,7 @@ import { normalizeTeamName } from "./apiFootball";
 import {
   mapLiveFixtures, mapLineups, orientLineups, isConfirmed,
 } from "./apiFootball";
+import { matchLiveFixture } from "./apiFootball";
 
 describe("normalizeTeamName", () => {
   it("baja a minúsculas, quita acentos, puntuación y sufijos de club", () => {
@@ -73,5 +74,23 @@ describe("isConfirmed", () => {
     const empty = { name: "", formation: "", coach: "", startXI: [], bench: [] };
     expect(isConfirmed({ home: full, away: full })).toBe(true);
     expect(isConfirmed({ home: full, away: empty })).toBe(false);
+  });
+});
+
+describe("matchLiveFixture", () => {
+  const fixtures = [
+    { fixtureId: 10, homeApiId: 50, awayApiId: 42, homeName: "Manchester City FC", awayName: "Arsenal FC" },
+    { fixtureId: 11, homeApiId: 1, awayApiId: 2, homeName: "Real Madrid", awayName: "Barcelona" },
+  ];
+  it("empareja por nombre normalizado de ambos equipos", () => {
+    const f = matchLiveFixture({ homeName: "Man City", awayName: "Arsenal", apiFixtureId: null }, fixtures);
+    expect(f?.fixtureId).toBe(10);
+  });
+  it("prefiere el apiFixtureId guardado (crosswalk auto-curado)", () => {
+    const f = matchLiveFixture({ homeName: "x", awayName: "y", apiFixtureId: 11 }, fixtures);
+    expect(f?.fixtureId).toBe(11);
+  });
+  it("devuelve null si no hay coincidencia", () => {
+    expect(matchLiveFixture({ homeName: "Sevilla", awayName: "Betis", apiFixtureId: null }, fixtures)).toBeNull();
   });
 });

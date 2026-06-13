@@ -97,3 +97,21 @@ export function orientLineups(teams: MappedTeamLineup[], fixture: LiveFixture): 
 export function isConfirmed(l: StoredLineups): boolean {
   return l.home.startXI.length > 0 && l.away.startXI.length > 0;
 }
+
+export type LiveMatchKey = { homeName: string; awayName: string; apiFixtureId: number | null };
+
+/** Encuentra el fixture en vivo de API-Football que corresponde a un partido nuestro.
+ *  Si ya hay apiFixtureId guardado, empareja por id (determinista); si no, por nombre
+ *  normalizado de AMBOS equipos. Devuelve null si no hay coincidencia. */
+export function matchLiveFixture(match: LiveMatchKey, fixtures: LiveFixture[]): LiveFixture | null {
+  if (match.apiFixtureId != null) {
+    return fixtures.find((f) => f.fixtureId === match.apiFixtureId) ?? null;
+  }
+  const home = normalizeTeamName(match.homeName);
+  const away = normalizeTeamName(match.awayName);
+  return (
+    fixtures.find(
+      (f) => normalizeTeamName(f.homeName) === home && normalizeTeamName(f.awayName) === away,
+    ) ?? null
+  );
+}
