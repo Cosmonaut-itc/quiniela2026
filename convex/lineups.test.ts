@@ -89,6 +89,7 @@ describe("liveMatchesNeedingLineup", () => {
   });
 });
 
+import { api } from "./_generated/api";
 import { runLineupSync } from "./lineups";
 import { vi } from "vitest";
 
@@ -154,5 +155,37 @@ describe("runLineupSync", () => {
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(upsert.mock.calls[0][0].matchId).toBe("m2");
     errorSpy.mockRestore();
+  });
+});
+
+describe("getLiveLineups", () => {
+  it("devuelve solo partidos en vivo del torneo de la quiniela, con su lineup", async () => {
+    const t = convexTest(schema, modules);
+    const quinielaId = await t.run(async (ctx) => {
+      const home = await ctx.db.insert("teams", { code: "AAA", name: "Alpha", flag: "🇦", group: "A", alive: true, currentStage: "group", externalId: "t1", tournamentCode: "WC" });
+      const away = await ctx.db.insert("teams", { code: "BBB", name: "Beta", flag: "🇧", group: "A", alive: true, currentStage: "group", externalId: "t2", tournamentCode: "WC" });
+      const liveMatch = await ctx.db.insert("matches", { stage: "group", kickoffAt: 0, status: "live", externalId: "live1", tournamentCode: "WC", homeTeamId: home, awayTeamId: away, homeScore: 1, awayScore: 0 });
+      await ctx.db.insert("matches", { stage: "group", kickoffAt: 0, status: "scheduled", externalId: "sched1", tournamentCode: "WC", homeTeamId: home, awayTeamId: away });
+      await ctx.db.insert("lineups", { matchId: liveMatch, tournamentCode: "WC", apiFixtureId: 7, fetchedAt: 0, confirmed: true,
+        home: { name: "Alpha", formation: "4-3-3", coach: "Pep", startXI: [{ name: "Ederson", number: 31 }], bench: [{ name: "Ortega" }] },
+        away: { name: "Beta", formation: "4-4-2", coach: "Arteta", startXI: [{ name: "Raya" }], bench: [] } });
+      return ctx.db.insert("quinielas", { name: "q", prizeText: "", numParticipants: 1, slotSizes: [1], adminToken: "a", joinToken: "j", status: "open", createdAt: 0, tournamentCode: "WC" });
+    });
+
+    const data = await t.query(api.lineups.getLiveLineups, { quinielaId });
+    expect(data.matches).toHaveLength(1);
+    const m = data.matches[0];
+    expect(m.home?.name).toBe("Alpha");
+    expect(m.homeScore).toBe(1);
+    expect(m.lineup?.home.startXI[0].name).toBe("Ederson");
+    expect(m.lineup?.away.coach).toBe("Arteta");
+  });
+
+  it("matches vacío si no hay partidos en vivo", async () => {
+    const t = convexTest(schema, modules);
+    const quinielaId = await t.run((ctx) =>
+      ctx.db.insert("quinielas", { name: "q", prizeText: "", numParticipants: 1, slotSizes: [1], adminToken: "a", joinToken: "j", status: "open", createdAt: 0, tournamentCode: "WC" }));
+    const data = await t.query(api.lineups.getLiveLineups, { quinielaId });
+    expect(data.matches).toEqual([]);
   });
 });

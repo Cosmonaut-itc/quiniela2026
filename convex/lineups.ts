@@ -1,8 +1,11 @@
-import { internalMutation, internalQuery, internalAction } from "./_generated/server";
+import { internalMutation, internalQuery, internalAction, query } from "./_generated/server";
 import { v } from "convex/values";
 import { teamLineupValidator } from "./lib/lineupShape";
 import { tournamentCodeOf } from "./lib/tournaments";
+import { teamLite } from "./lib/view";
 import { internal } from "./_generated/api";
+import type { LiveLineupsData, LiveMatchLineupView, TeamLineupView, LineupPlayerView } from "./types";
+import type { Doc } from "./_generated/dataModel";
 import {
   fetchLiveFixtures, fetchLineups, matchLiveFixture, orientLineups, isConfirmed,
   type LiveFixture, type MappedTeamLineup, type StoredLineups,
@@ -151,5 +154,67 @@ export const syncLineups = internalAction({
       now: Date.now(),
     });
     return { ok: true };
+  },
+});
+
+function playerView(p: { name: string; number?: number; pos?: string }): LineupPlayerView {
+  return { name: p.name, number: p.number ?? null, pos: p.pos ?? null };
+}
+function teamLineupView(t: Doc<"lineups">["home"]): TeamLineupView {
+  return { formation: t.formation, coach: t.coach, startXI: t.startXI.map(playerView), bench: t.bench.map(playerView) };
+}
+
+/** Partidos en vivo del torneo de la quiniela + su alineación cacheada. Reactiva. */
+export const getLiveLineups = query({
+  args: { quinielaId: v.id("quinielas") },
+  returns: v.object({
+    matches: v.array(v.object({
+      matchId: v.string(),
+      home: v.union(v.object({ code: v.string(), name: v.string(), flag: v.string(), group: v.string() }), v.null()),
+      away: v.union(v.object({ code: v.string(), name: v.string(), flag: v.string(), group: v.string() }), v.null()),
+      homeScore: v.union(v.number(), v.null()),
+      awayScore: v.union(v.number(), v.null()),
+      lineup: v.union(
+        v.object({
+          home: v.object({
+            formation: v.string(), coach: v.string(),
+            startXI: v.array(v.object({ name: v.string(), number: v.union(v.number(), v.null()), pos: v.union(v.string(), v.null()) })),
+            bench: v.array(v.object({ name: v.string(), number: v.union(v.number(), v.null()), pos: v.union(v.string(), v.null()) })),
+          }),
+          away: v.object({
+            formation: v.string(), coach: v.string(),
+            startXI: v.array(v.object({ name: v.string(), number: v.union(v.number(), v.null()), pos: v.union(v.string(), v.null()) })),
+            bench: v.array(v.object({ name: v.string(), number: v.union(v.number(), v.null()), pos: v.union(v.string(), v.null()) })),
+          }),
+        }),
+        v.null(),
+      ),
+    })),
+  }),
+  handler: async (ctx, { quinielaId }): Promise<LiveLineupsData> => {
+    const qn = await ctx.db.get(quinielaId);
+    if (!qn) return { matches: [] };
+    const code = tournamentCodeOf(qn);
+    const matches = (await ctx.db.query("matches").collect()).filter(
+      (m) => m.status === "live" && tournamentCodeOf(m) === code,
+    );
+    const out: LiveMatchLineupView[] = [];
+    for (const m of matches) {
+      const home = m.homeTeamId ? await ctx.db.get(m.homeTeamId) : null;
+      const away = m.awayTeamId ? await ctx.db.get(m.awayTeamId) : null;
+      const row = await ctx.db
+        .query("lineups")
+        .withIndex("by_match", (q) => q.eq("matchId", m._id))
+        .first();
+      out.push({
+        matchId: m._id as string,
+        home: teamLite(home),
+        away: teamLite(away),
+        homeScore: m.homeScore ?? null,
+        awayScore: m.awayScore ?? null,
+        lineup: row ? { home: teamLineupView(row.home), away: teamLineupView(row.away) } : null,
+      });
+    }
+    return { matches: out };
   },
 });

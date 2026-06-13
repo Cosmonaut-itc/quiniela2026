@@ -150,3 +150,16 @@ export type NotificationItem = {
   id: string; type: string; title: string; body: string; createdAt: number; read: boolean;
 };
 export type NotificationsData = { items: NotificationItem[]; unreadCount: number };
+
+export type LineupPlayerView = { name: string; number: number | null; pos: string | null };
+export type TeamLineupView = {
+  formation: string; coach: string;
+  startXI: LineupPlayerView[]; bench: LineupPlayerView[];
+};
+export type LiveMatchLineupView = {
+  matchId: string;
+  home: TeamLite | null; away: TeamLite | null;
+  homeScore: number | null; awayScore: number | null;
+  lineup: { home: TeamLineupView; away: TeamLineupView } | null;
+};
+export type LiveLineupsData = { matches: LiveMatchLineupView[] };
