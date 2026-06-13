@@ -9,14 +9,17 @@
  */
 
 import type * as crons from "../crons.js";
+import type * as lib_apiFootball from "../lib/apiFootball.js";
 import type * as lib_distribution from "../lib/distribution.js";
 import type * as lib_footballData from "../lib/footballData.js";
+import type * as lib_lineupShape from "../lib/lineupShape.js";
 import type * as lib_matchSelect from "../lib/matchSelect.js";
 import type * as lib_notify from "../lib/notify.js";
 import type * as lib_perQuiniela from "../lib/perQuiniela.js";
 import type * as lib_progol from "../lib/progol.js";
 import type * as lib_push from "../lib/push.js";
 import type * as lib_resolve from "../lib/resolve.js";
+import type * as lib_standings from "../lib/standings.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
 import type * as lib_tournaments from "../lib/tournaments.js";
@@ -43,14 +46,17 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
+  "lib/apiFootball": typeof lib_apiFootball;
   "lib/distribution": typeof lib_distribution;
   "lib/footballData": typeof lib_footballData;
+  "lib/lineupShape": typeof lib_lineupShape;
   "lib/matchSelect": typeof lib_matchSelect;
   "lib/notify": typeof lib_notify;
   "lib/perQuiniela": typeof lib_perQuiniela;
   "lib/progol": typeof lib_progol;
   "lib/push": typeof lib_push;
   "lib/resolve": typeof lib_resolve;
+  "lib/standings": typeof lib_standings;
   "lib/tokens": typeof lib_tokens;
   "lib/tournament": typeof lib_tournament;
   "lib/tournaments": typeof lib_tournaments;
