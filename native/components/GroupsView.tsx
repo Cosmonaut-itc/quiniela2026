@@ -55,7 +55,7 @@ export function GroupsView({
               >
                 <View className="min-w-0 flex-1 flex-row items-center gap-2">
                   <View
-                    className={`w-1.5 h-1.5 shrink-0 rounded-full ${
+                    className={`size-1.5 shrink-0 rounded-full ${
                       advancing
                         ? "bg-alive"
                         : out
