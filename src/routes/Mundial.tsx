@@ -8,6 +8,7 @@ import { StandingsView } from "@/components/StandingsView";
 import { Shell, BottomNav } from "@/components/Shell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LiveLineups } from "@/components/LiveLineups";
 
 function LoadingState() {
   return (
@@ -27,6 +28,8 @@ function LoadingState() {
 export default function Mundial() {
   const { id } = useParams();
   const data = useQuery(api.mundial.getTorneo, { quinielaId: id as Id<"quinielas"> });
+  const live = useQuery(api.lineups.getLiveLineups, { quinielaId: id as Id<"quinielas"> });
+  const liveSection = live ? <LiveLineups matches={live.matches} /> : null;
 
   if (data === undefined) return <LoadingState />;
 
@@ -44,6 +47,7 @@ export default function Mundial() {
     return (
       <Shell bottomNav={bottomNav}>
         {header}
+        {liveSection}
         <p className="mb-4 text-sm text-muted-foreground">
           Tabla de posiciones del torneo.
         </p>
@@ -55,6 +59,7 @@ export default function Mundial() {
   return (
     <Shell bottomNav={bottomNav}>
       {header}
+      {liveSection}
       <p className="mb-4 text-sm text-muted-foreground">
         {data.showOwners
           ? "Cada equipo lleva la cara de su dueño."
