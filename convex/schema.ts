@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { teamLineupValidator } from "./lib/lineupShape";
 
 export default defineSchema({
   teams: defineTable({
@@ -44,6 +45,18 @@ export default defineSchema({
     .index("by_kickoff", ["kickoffAt"])
     .index("by_tournament_kickoff", ["tournamentCode", "kickoffAt"])
     .index("by_tournament_externalId", ["tournamentCode", "externalId"]),
+
+  lineups: defineTable({
+    matchId: v.id("matches"),
+    tournamentCode: v.string(),
+    apiFixtureId: v.optional(v.number()), // fixture de API-Football reconciliado
+    home: teamLineupValidator,
+    away: teamLineupValidator,
+    fetchedAt: v.number(),
+    confirmed: v.boolean(), // ambos equipos ya publicaron el 11
+  })
+    .index("by_match", ["matchId"])
+    .index("by_tournament", ["tournamentCode"]),
 
   quinielas: defineTable({
     name: v.string(),
