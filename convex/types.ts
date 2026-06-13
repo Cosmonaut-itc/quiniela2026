@@ -151,6 +151,10 @@ export type NotificationItem = {
 };
 export type NotificationsData = { items: NotificationItem[]; unreadCount: number };
 
+// Tipos de vista de getLiveLineups. La fila guarda number/pos como `v.optional`
+// (undefined si la API aún no los publica); la query los normaliza a `null` en el
+// límite del wire para una forma estable, por eso aquí son `| null` y no `| undefined`.
+// Fuente de verdad de qué es opcional: playerValidator en lib/lineupShape.ts.
 export type LineupPlayerView = { name: string; number: number | null; pos: string | null };
 export type TeamLineupView = {
   formation: string; coach: string;
