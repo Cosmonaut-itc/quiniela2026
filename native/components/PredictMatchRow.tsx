@@ -38,12 +38,12 @@ export function PredictMatchRow({
           ) : (
             <Text className="font-sans text-lg leading-none">❔</Text>
           )}
-          <Text numberOfLines={1} className="font-sans text-sm font-medium">
+          <Text numberOfLines={1} className="font-sans text-sm font-medium text-foreground">
             {homeCode}
           </Text>
         </View>
         {m.state === "finished" ? (
-          <Text className="font-heading text-sm font-bold tabular-nums">
+          <Text className="font-heading text-sm font-bold tabular-nums text-foreground">
             {m.homeScore}–{m.awayScore}
           </Text>
         ) : (
@@ -52,7 +52,7 @@ export function PredictMatchRow({
           </Text>
         )}
         <View className="min-w-0 flex-1 flex-row items-center justify-end gap-1.5">
-          <Text numberOfLines={1} className="font-sans text-sm font-medium">
+          <Text numberOfLines={1} className="font-sans text-sm font-medium text-foreground">
             {awayCode}
           </Text>
           {m.away ? (
