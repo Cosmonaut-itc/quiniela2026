@@ -7,6 +7,8 @@ const TEAM_ALIASES: Record<string, string> = {
   "man city": "manchester city",
   "man united": "manchester united",
   "man utd": "manchester united",
+  // Selecciones: API-Football usa el nombre FIFA actual; nuestra semilla, el legacy.
+  turkiye: "turkey", // "Türkiye" (de-acentuado) → "Turkey"
 };
 
 const CLUB_SUFFIXES = /\b(fc|cf|afc|sc|ac|cd|ssc|rc)\b/g;

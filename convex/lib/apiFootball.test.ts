@@ -16,6 +16,9 @@ describe("normalizeTeamName", () => {
   it("aplica alias curados", () => {
     expect(normalizeTeamName("Man City")).toBe("manchester city");
   });
+  it("reconcilia el rebrand FIFA Turkey↔Türkiye (API-Football usa Türkiye)", () => {
+    expect(normalizeTeamName("Türkiye")).toBe(normalizeTeamName("Turkey"));
+  });
 });
 
 describe("mapLiveFixtures", () => {
@@ -94,6 +97,12 @@ describe("matchLiveFixture", () => {
   });
   it("devuelve null si no hay coincidencia", () => {
     expect(matchLiveFixture({ homeName: "Sevilla", awayName: "Betis", apiFixtureId: null }, fixtures)).toBeNull();
+  });
+  it("empareja aunque API-Football nombre a Turquía 'Türkiye' (nuestra semilla dice 'Turkey')", () => {
+    // Caso real: fixture en vivo Australia vs Türkiye; nuestro partido es Australia vs Turkey.
+    const wc = [{ fixtureId: 1539001, homeApiId: 779, awayApiId: 803, homeName: "Australia", awayName: "Türkiye" }];
+    const f = matchLiveFixture({ homeName: "Australia", awayName: "Turkey", apiFixtureId: null }, wc);
+    expect(f?.fixtureId).toBe(1539001);
   });
 });
 
