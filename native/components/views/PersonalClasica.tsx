@@ -22,14 +22,14 @@
 // lanzar — un token inválido lanza durante el render y el BottomNav nunca monta,
 // preservando "un token inválido nunca se persiste" sin un gate aparte. Esta
 // vista NO añade una segunda ruta de persistencia.
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { router } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { PersonalData } from "@convex/types";
 import { prizeBanner, whenLabel } from "@shared/format";
-import { Avatar } from "@/components/Avatar";
+import { EditableAvatar } from "@/components/EditableAvatar";
 import { SectionHeading, PrizeBanner, EmptyTile } from "@/components/bits";
 import { GradientFill, GrainCard, gradients } from "@/components/Grain";
 import { Cargando } from "@/components/Pantalla";
@@ -45,6 +45,12 @@ export function PersonalClasica({ quinielaId, personalToken }: Props) {
   // undefined (→ "Mundial").
   const mode = useQuery(api.quinielas.getMode, { id: quinielaId as Id<"quinielas"> });
   const data = useQuery(api.participants.getPersonalPanel, { personalToken });
+  const updatePhoto = useMutation(api.participants.updateParticipantPhoto);
+  // Se deja propagar el error: EditableAvatar lo registra y revierte el preview
+  // optimista (si tragáramos aquí, el avatar mostraría una foto que no se guardó).
+  async function onChangePhoto(photoId: Id<"_storage">) {
+    await updatePhoto({ personalToken, photoId });
+  }
 
   if (data === undefined) return <Cargando />;
 
@@ -78,15 +84,14 @@ export function PersonalClasica({ quinielaId, personalToken }: Props) {
       <GrainCard className="-mx-4 rounded-b-3xl border-b border-border px-4 pb-6">
         <View className="flex-row items-center justify-between gap-3">
           <View className="min-w-0 flex-1 flex-row items-center gap-3">
-            {/* Anillo de campeón: lo dibuja el llamador (gold-ring → border),
-                solo en status champion (ver Avatar.tsx). */}
-            {me.status === "champion" ? (
-              <View className="rounded-full border-2 border-gold">
-                <Avatar name={me.name} url={me.photoUrl} size={48} />
-              </View>
-            ) : (
-              <Avatar name={me.name} url={me.photoUrl} size={48} />
-            )}
+            {/* Anillo de campeón: EditableAvatar lo recibe como ringClassName. */}
+            <EditableAvatar
+              name={me.name}
+              url={me.photoUrl}
+              size={48}
+              ringClassName={me.status === "champion" ? "rounded-full border-2 border-gold" : undefined}
+              onUploaded={onChangePhoto}
+            />
             <View className="min-w-0 flex-1">
               <Text
                 numberOfLines={1}

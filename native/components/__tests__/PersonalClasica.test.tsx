@@ -42,8 +42,11 @@ jest.mock("@/lib/storage", () => ({
   setToken: jest.fn(async () => undefined),
 }));
 
-// convex/react useQuery: despacha por NOMBRE de query (ver cabecera). Cada test
-// arma mockModeValue / mockPanelValue antes de render.
+// convex/react: useQuery despacha por NOMBRE de query (ver cabecera). Cada test
+// arma mockModeValue / mockPanelValue antes de render. useMutation se stueba con
+// un no-op (SEN-27: PersonalClasica ahora llama useMutation para updatePhoto y
+// EditableAvatar llama useMutation para generateUploadUrl; ninguno se activa en
+// render, solo en interacción).
 let mockModeValue: unknown;
 let mockPanelValue: unknown;
 jest.mock("convex/react", () => ({
@@ -55,6 +58,7 @@ jest.mock("convex/react", () => ({
     if (name === "participants:getPersonalPanel") return mockPanelValue;
     return undefined;
   },
+  useMutation: () => jest.fn(async () => undefined),
 }));
 
 const mode = {

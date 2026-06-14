@@ -3,10 +3,10 @@
 // Ronda — en liga UNA jornada a la vez con ◀▶ (aterriza en la jornada en curso);
 // en eliminatorio, todas las etapas en lista.
 //
-// Salvedades del port nativo (decididas en el spec de SEN-26):
-//   - EditableAvatar / subida de foto → fuera de alcance (SEN-27): se usa el
-//     Avatar read-only. NotificationBell / PushOptIn / push → fuera (SEN-28): se
-//     omiten. toast (sonner) para errores de predict → no portado: el catch hace
+// Salvedades del port nativo (decididas en el spec de SEN-26, actualizado SEN-27):
+//   - EditableAvatar / subida de foto → portado en SEN-27 (ya no fuera de alcance).
+//     NotificationBell / PushOptIn / push → fuera (SEN-28): se omiten.
+//     toast (sonner) para errores de predict → no portado: el catch hace
 //     console.warn (mismo patrón aceptado que FormularioUnirse), no revienta el
 //     render ni añade dependencias.
 //   - bg-pitch (rayas) / header-safe (bleed PWA) / la clase `grain` a mano → se
@@ -27,7 +27,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { Pick } from "@convex/types";
 import { prizeBanner } from "@shared/format";
-import { Avatar } from "@/components/Avatar";
+import { EditableAvatar } from "@/components/EditableAvatar";
 import { PrizeBanner } from "@/components/bits";
 import { GrainCard } from "@/components/Grain";
 import { Cargando } from "@/components/Pantalla";
@@ -40,6 +40,12 @@ export function ProgolPersonal({ quinielaId, personalToken }: Props) {
   const data = useQuery(api.progol.getPersonal, { personalToken });
   const mode = useQuery(api.quinielas.getMode, { id: quinielaId as Id<"quinielas"> });
   const predict = useMutation(api.progol.predict);
+  const updatePhoto = useMutation(api.participants.updateParticipantPhoto);
+  // Se deja propagar el error: EditableAvatar lo registra y revierte el preview
+  // optimista (si tragáramos aquí, el avatar mostraría una foto que no se guardó).
+  async function onChangePhoto(photoId: Id<"_storage">) {
+    await updatePhoto({ personalToken, photoId });
+  }
   // Ronda elegida por el usuario; null = aterrizar en la ronda en curso (estado
   // derivado de currentRonda, sin setState en effects — regla del repo). setRonda
   // se llama SOLO en los handlers de press de los chevrons (no en un effect).
@@ -90,7 +96,12 @@ export function ProgolPersonal({ quinielaId, personalToken }: Props) {
       <GrainCard className="-mx-4 rounded-b-3xl border-b border-border px-4 pb-6">
         <View className="flex-row items-center justify-between gap-3">
           <View className="min-w-0 flex-1 flex-row items-center gap-3">
-            <Avatar name={who.name} url={who.photoUrl} size={48} />
+            <EditableAvatar
+              name={who.name}
+              url={who.photoUrl}
+              size={48}
+              onUploaded={onChangePhoto}
+            />
             <View className="min-w-0 flex-1">
               <Text
                 numberOfLines={1}
