@@ -7,8 +7,12 @@ const TEAM_ALIASES: Record<string, string> = {
   "man city": "manchester city",
   "man united": "manchester united",
   "man utd": "manchester united",
-  // Selecciones: API-Football usa el nombre FIFA actual; nuestra semilla, el legacy.
+  // Selecciones del Mundial: API-Football usa el nombre FIFA actual; nuestra
+  // semilla (football-data.org), otro. Confirmados contra la API el 2026-06-13;
+  // las otras 45 selecciones normalizan igual en ambos proveedores.
   turkiye: "turkey", // "Türkiye" (de-acentuado) → "Turkey"
+  usa: "united states", // API "USA" → semilla "United States"
+  "bosnia & herzegovina": "bosnia herzegovina", // API "Bosnia & Herzegovina" → semilla "Bosnia-Herzegovina"
 };
 
 const CLUB_SUFFIXES = /\b(fc|cf|afc|sc|ac|cd|ssc|rc)\b/g;

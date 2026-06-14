@@ -19,6 +19,12 @@ describe("normalizeTeamName", () => {
   it("reconcilia el rebrand FIFA Turkey↔Türkiye (API-Football usa Türkiye)", () => {
     expect(normalizeTeamName("Türkiye")).toBe(normalizeTeamName("Turkey"));
   });
+  it("reconcilia divergencias de nombre de selección WC entre semilla y API-Football", () => {
+    // Confirmado contra la API el 2026-06-13: API-Football usa "USA" y "Bosnia &
+    // Herzegovina"; nuestra semilla (football-data.org), "United States" y "Bosnia-Herzegovina".
+    expect(normalizeTeamName("USA")).toBe(normalizeTeamName("United States"));
+    expect(normalizeTeamName("Bosnia & Herzegovina")).toBe(normalizeTeamName("Bosnia-Herzegovina"));
+  });
 });
 
 describe("mapLiveFixtures", () => {
