@@ -4,7 +4,7 @@ import {
   mapLiveFixtures, mapLineups, orientLineups, isConfirmed,
 } from "./apiFootball";
 import { matchLiveFixture } from "./apiFootball";
-import { fetchLiveFixtures, fetchLineups } from "./apiFootball";
+import { fetchLiveFixtures, fetchLineups, fetchFixturesByDate } from "./apiFootball";
 import { vi } from "vitest";
 
 describe("normalizeTeamName", () => {
@@ -131,5 +131,18 @@ describe("fetchLiveFixtures / fetchLineups", () => {
   it("lanza si la respuesta no es ok", async () => {
     const fetchFn = vi.fn(async () => fakeRes({ status: 500 }));
     await expect(fetchLineups("KEY", 7, { fetchFn })).rejects.toThrow("api-football 500");
+  });
+});
+
+describe("fetchFixturesByDate", () => {
+  it("pega a /fixtures?date=YYYY-MM-DD y mapea como los fixtures en vivo", async () => {
+    const fetchFn = vi.fn(async () => fakeRes({ status: 200, body: {
+      response: [{ fixture: { id: 99 }, teams: { home: { id: 3, name: "Haiti" }, away: { id: 4, name: "Scotland" } } }],
+    } }));
+    const out = await fetchFixturesByDate("KEY", "2026-06-13", { fetchFn });
+    expect(out).toEqual([{ fixtureId: 99, homeApiId: 3, awayApiId: 4, homeName: "Haiti", awayName: "Scotland" }]);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(String(url)).toContain("/fixtures?date=2026-06-13");
+    expect((init as RequestInit).headers).toMatchObject({ "x-apisports-key": "KEY" });
   });
 });

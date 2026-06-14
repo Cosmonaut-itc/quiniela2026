@@ -148,3 +148,10 @@ export async function fetchLiveFixtures(token: string, deps: FetchDeps = {}): Pr
 export async function fetchLineups(token: string, fixtureId: number, deps: FetchDeps = {}): Promise<MappedTeamLineup[]> {
   return mapLineups((await fetchJson(`${BASE}/fixtures/lineups?fixture=${fixtureId}`, token, deps)) as { response?: RawLineupTeam[] });
 }
+
+/** Fixtures de una fecha (UTC, YYYY-MM-DD). Para descubrir el fixtureId de un
+ *  partido que aún no empieza —no aparece en /fixtures?live=all—; misma forma de
+ *  respuesta que los fixtures en vivo, así que reutiliza mapLiveFixtures. */
+export async function fetchFixturesByDate(token: string, date: string, deps: FetchDeps = {}): Promise<LiveFixture[]> {
+  return mapLiveFixtures((await fetchJson(`${BASE}/fixtures?date=${date}`, token, deps)) as { response?: RawFixture[] });
+}
