@@ -162,6 +162,8 @@ export type TeamLineupView = {
 };
 export type LiveMatchLineupView = {
   matchId: string;
+  status: "live" | "scheduled"; // "scheduled" = aún sin empezar pero con 11 confirmado (preview)
+  kickoffAt: number;
   home: TeamLite | null; away: TeamLite | null;
   homeScore: number | null; awayScore: number | null;
   lineup: { home: TeamLineupView; away: TeamLineupView } | null;

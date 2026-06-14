@@ -8,10 +8,20 @@ import {
  *  Presentacional: la ruta inyecta `matches` desde getLiveLineups. */
 export function LiveLineups({ matches }: { matches: LiveMatchLineupView[] }) {
   if (matches.length === 0) return null;
+  // Agendados (con 11 confirmado) se muestran antes del saque; el rótulo y el punto
+  // solo "laten" en rojo si hay al menos un partido realmente en vivo.
+  const hasLive = matches.some((m) => m.status === "live");
   return (
     <section className="mb-5">
       <h2 className="mb-2 flex items-center gap-1.5 font-heading text-sm font-bold tracking-wide text-muted-foreground uppercase">
-        <span className="inline-block size-2 animate-pulse rounded-full bg-eliminated" /> En vivo
+        <span
+          className={
+            hasLive
+              ? "inline-block size-2 animate-pulse rounded-full bg-eliminated"
+              : "inline-block size-2 rounded-full bg-muted-foreground/60"
+          }
+        />{" "}
+        {hasLive ? "En vivo" : "Por comenzar"}
       </h2>
       <div className="space-y-2">
         {matches.map((m) => (
@@ -38,6 +48,12 @@ export function LiveLineups({ matches }: { matches: LiveMatchLineupView[] }) {
   );
 }
 
+/** Hora de saque local (HH:MM) para los partidos agendados. */
+function kickoffTime(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function MatchHeader({ m }: { m: LiveMatchLineupView }) {
   return (
     <div className="flex items-center justify-between gap-2">
@@ -45,7 +61,11 @@ function MatchHeader({ m }: { m: LiveMatchLineupView }) {
         {m.home && <TeamFlag flag={m.home.flag} name={m.home.name} className="text-lg leading-none" />}
         <span className="truncate text-sm font-medium">{m.home?.name ?? "—"}</span>
       </span>
-      <span className="font-heading text-sm font-bold tabular-nums">{m.homeScore ?? 0}–{m.awayScore ?? 0}</span>
+      {m.status === "live" ? (
+        <span className="font-heading text-sm font-bold tabular-nums">{m.homeScore ?? 0}–{m.awayScore ?? 0}</span>
+      ) : (
+        <span className="shrink-0 font-heading text-xs font-semibold tabular-nums text-muted-foreground">{kickoffTime(m.kickoffAt)}</span>
+      )}
       <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right">
         <span className="truncate text-sm font-medium">{m.away?.name ?? "—"}</span>
         {m.away && <TeamFlag flag={m.away.flag} name={m.away.name} className="text-lg leading-none" />}

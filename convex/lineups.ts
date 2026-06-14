@@ -217,6 +217,8 @@ export const getLiveLineups = query({
   returns: v.object({
     matches: v.array(v.object({
       matchId: v.string(),
+      status: v.union(v.literal("live"), v.literal("scheduled")),
+      kickoffAt: v.number(),
       home: v.union(v.object({ code: v.string(), name: v.string(), flag: v.string(), group: v.string() }), v.null()),
       away: v.union(v.object({ code: v.string(), name: v.string(), flag: v.string(), group: v.string() }), v.null()),
       homeScore: v.union(v.number(), v.null()),
@@ -242,19 +244,25 @@ export const getLiveLineups = query({
     const qn = await ctx.db.get(quinielaId);
     if (!qn) return { matches: [] };
     const code = tournamentCodeOf(qn);
-    const matches = (await ctx.db.query("matches").collect()).filter(
-      (m) => m.status === "live" && tournamentCodeOf(m) === code,
+    const candidates = (await ctx.db.query("matches").collect()).filter(
+      (m) => tournamentCodeOf(m) === code && (m.status === "live" || m.status === "scheduled"),
     );
     const out: LiveMatchLineupView[] = [];
-    for (const m of matches) {
-      const home = m.homeTeamId ? await ctx.db.get(m.homeTeamId) : null;
-      const away = m.awayTeamId ? await ctx.db.get(m.awayTeamId) : null;
+    for (const m of candidates) {
       const row = await ctx.db
         .query("lineups")
         .withIndex("by_match", (q) => q.eq("matchId", m._id))
         .first();
+      // En vivo: siempre se muestra (aunque el 11 aún no esté completo).
+      // Agendado: solo si el sondeo pre-saque ya dejó una alineación CONFIRMADA,
+      // así el usuario la ve antes del pitazo sin tarjetas a medias.
+      if (m.status === "scheduled" && !row?.confirmed) continue;
+      const home = m.homeTeamId ? await ctx.db.get(m.homeTeamId) : null;
+      const away = m.awayTeamId ? await ctx.db.get(m.awayTeamId) : null;
       out.push({
         matchId: m._id as string,
+        status: m.status === "live" ? "live" : "scheduled",
+        kickoffAt: m.kickoffAt,
         home: teamLite(home),
         away: teamLite(away),
         homeScore: m.homeScore ?? null,
