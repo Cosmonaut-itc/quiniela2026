@@ -1,33 +1,66 @@
-// Vista mínima de la general Progol (espejo de src/routes/progol/
-// ProgolGeneral.tsx): datos reales en crudo + flujo de inscripción end-to-end
-// (sin foto, llega con SEN-25). SEN-26 la reemplaza por el port real.
+// Port nativo de la vista General/Invitación Progol (SEN-26). Espejo de
+// src/routes/progol/ProgolGeneral.tsx (el usePhotoUpload y el Dialog de
+// inscripción de la web NO se portan: la foto es SEN-27, el form es
+// FormularioUnirse). Gemela Progol de JoinClasica: misma estructura
+// (Shell+BottomNav, header GrainCard, notas, link al torneo, CTA tri-estado),
+// más la tabla de posiciones (Leaderboard) y la tarjeta ajena (ViewCard).
+//
+// Salvedades del port nativo (decididas en el spec):
+//   - bg-pitch / header-safe / glow-primary NO se portan: uniwind no los compila
+//     → deuda decorativa aceptada (el grano sí va vía GrainCard; el Shell aplica
+//     el inset del safe-area). El header sigue sangrando horizontal (-mx-4 px-4).
+//   - El Dialog web de inscripción → FormularioUnirse inline (name-only, sin foto).
+//   - El ViewCardDialog web → ViewCard, montado en el PRIMER <Modal> nativo.
+//   - Progol NO tiene tope de lugares (a diferencia de Clásica): el subtítulo es
+//     "{n} jugadores · {estado}" (sin "X de Y lugares") y canJoin = status open.
+//   - Toda cadena va en <Text> con su clase de fuente explícita (no hay cascada
+//     en RN). La foto de la quiniela es <Image> de expo-image; el fallback es el
+//     emoji 🎯 (como la web; Clásica usa 🏟️).
+//
+// Persistencia (invariante de identidad): la dueña del join token es el BottomNav
+// (lo persiste en su propio effect). Vive en el JSX del camino feliz, así que solo
+// monta cuando getGeneral resolvió SIN lanzar — un token inválido lanza en render
+// y el BottomNav nunca monta, preservando "un token inválido nunca se persiste"
+// sin un gate aparte. Esta vista NO añade una segunda ruta de persistencia del
+// join token (se quitó el setToken(id,"join") del stub previo). El setToken(id,
+// "me",…) dentro de unirse SÍ va: es escritura post-inscripción en un handler, no
+// persistencia del join token (igual que JoinClasica).
 import { useMutation, useQuery } from "convex/react";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Button } from "heroui-native";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { prizeBanner } from "@shared/format";
+import { SectionHeading, PrizeBanner } from "@/components/bits";
 import { FormularioUnirse } from "@/components/FormularioUnirse";
 import { GrainCard } from "@/components/Grain";
-import { Cargando, Pantalla } from "@/components/Pantalla";
+import { Leaderboard } from "@/components/Leaderboard";
+import { Cargando } from "@/components/Pantalla";
+import { Shell, BottomNav } from "@/components/Shell";
+import { ViewCard } from "@/components/ViewCard";
 import { getToken, setToken } from "@/lib/storage";
 
 type Props = { quinielaId: string; joinToken: string };
 
 export function ProgolGeneral({ quinielaId, joinToken }: Props) {
+  // Solo alimenta tournament al BottomNav y el label condicional del link al
+  // torneo (liga vs eliminatorio). La ruta ya tiene esta misma suscripción
+  // cacheada, así que resuelve de inmediato; el BottomNav tolera undefined.
+  const mode = useQuery(api.quinielas.getMode, { id: quinielaId as Id<"quinielas"> });
   const data = useQuery(api.progol.getGeneral, { joinToken });
   const join = useMutation(api.participants.joinQuiniela);
 
+  // Tarjeta ajena: id del participante seleccionado en el Leaderboard (null =
+  // ninguna abierta). Espejo del estado `viewing` de la web.
+  const [viewing, setViewing] = useState<string | null>(null);
+
   // "Ya inscrito en este dispositivo" = existe token "me" en Keychain (espejo
-  // del readStoredToken síncrono de la web).
-  //
-  // Estado derivado: guardamos la lectura como { id, token } para atar el
-  // resultado a la quinielaId que lo generó. Si quinielaId cambia (p. ej. por
-  // un deep link que pushea una instancia nueva), meToken se recalcula a
-  // undefined (= pendiente) en lugar de mostrar el token de la quiniela
-  // anterior. ESLint prohíbe setState síncrono en effects, por eso no
-  // reseteamos el state dentro del effect al cambiar quinielaId; en su lugar
-  // la derivación lo hace sin efecto secundario.
+  // del readStoredToken síncrono de la web → alreadyJoined). Estado derivado:
+  // guardamos la lectura como { id, token } para atarla a la quinielaId que la
+  // generó; si quinielaId cambia, meToken se recalcula a undefined (pendiente)
+  // sin un setState en el body del effect (lo prohíbe set-state-in-effect).
   //
   // Tri-estado: undefined = lectura en curso (se oculta el CTA para evitar
   // parpadeo); null = no hay token; string = ya inscrito.
@@ -46,15 +79,6 @@ export function ProgolGeneral({ quinielaId, joinToken }: Props) {
   // Derivado: solo se usa el token si pertenece a la quinielaId actual.
   const meToken = lectura?.id === quinielaId ? lectura.token : undefined;
 
-  // Espejo del effect del BottomNav web (Shell.tsx): persistir el join token,
-  // pero solo cuando la query resolvió — un token inválido no se persiste
-  // (en la web el BottomNav solo monta en éxito).
-  const loaded = data !== undefined;
-  useEffect(() => {
-    if (!loaded) return;
-    void setToken(quinielaId, "join", joinToken);
-  }, [loaded, quinielaId, joinToken]);
-
   if (data === undefined) return <Cargando />;
 
   const { quiniela } = data;
@@ -66,6 +90,12 @@ export function ProgolGeneral({ quinielaId, joinToken }: Props) {
       : quiniela.status === "locked"
         ? "Inscripciones cerradas"
         : "Mundial finalizado";
+
+  const b = prizeBanner(quiniela.prize, quiniela.status, " al líder");
+  const linkLabel =
+    mode?.tournament.format === "liga"
+      ? "Ver tabla de posiciones del torneo"
+      : "Ver grupos y bracket del Mundial";
 
   async function unirse(nombre: string) {
     const res = await join({ joinToken, name: nombre });
@@ -79,62 +109,102 @@ export function ProgolGeneral({ quinielaId, joinToken }: Props) {
   }
 
   return (
-    <Pantalla>
-      <Text className="font-heading font-bold text-2xl text-foreground">
-        {quiniela.name}
-      </Text>
-      <Text className="mt-1 font-sans text-sm text-muted-foreground">
-        {quiniela.filledCount}{" "}
-        {quiniela.filledCount === 1 ? "jugador" : "jugadores"} · {statusLabel}
-      </Text>
-
-      <GrainCard className="mt-5 rounded-2xl border border-border bg-card px-4 py-3">
-        <Text className="font-sans font-bold text-sm text-foreground">
-          Tabla de posiciones · {data.decidedMatches} jugados
-        </Text>
-        {data.leaderboard.length === 0 ? (
-          <Text className="mt-2 font-sans text-sm text-muted-foreground">
-            Aún no se inscribe nadie.
-          </Text>
-        ) : (
-          data.leaderboard.map((row) => (
-            <View
-              key={row.participantId}
-              className="mt-2 flex-row items-center justify-between"
-            >
-              <Text className="font-sans text-sm text-foreground">
-                #{row.rank} {row.name}
-              </Text>
-              <Text className="font-sans text-sm text-muted-foreground">
-                {row.points} pts
-              </Text>
+    <Shell
+      bottomNav={
+        <BottomNav
+          id={quinielaId}
+          active="general"
+          joinToken={joinToken}
+          tournament={mode?.tournament}
+        />
+      }
+    >
+      {/* Header (web <header className="grain bg-pitch header-safe …">). El
+          -mx-4 px-4 lo sangra hasta el borde del Shell; bg-pitch / header-safe
+          se omiten (ver cabecera del archivo). */}
+      <GrainCard className="-mx-4 rounded-b-3xl border-b border-border px-4 pb-6">
+        <View className="flex-row items-center gap-3.5">
+          {quiniela.photoUrl ? (
+            <Image
+              source={{ uri: quiniela.photoUrl }}
+              contentFit="cover"
+              style={{ width: 56, height: 56 }}
+              className="shrink-0 rounded-2xl"
+            />
+          ) : (
+            <View className="size-14 shrink-0 items-center justify-center rounded-2xl bg-secondary">
+              <Text className="font-sans text-3xl">🎯</Text>
             </View>
-          ))
-        )}
+          )}
+          <View className="min-w-0 flex-1">
+            <Text
+              numberOfLines={1}
+              className="font-heading text-2xl font-extrabold text-foreground"
+            >
+              {quiniela.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              className="font-sans text-sm text-muted-foreground"
+            >
+              {quiniela.filledCount}{" "}
+              {quiniela.filledCount === 1 ? "jugador" : "jugadores"} ·{" "}
+              {statusLabel}
+            </Text>
+          </View>
+        </View>
+        {b ? <PrizeBanner title={b.title} subline={b.subline} /> : null}
       </GrainCard>
 
-      {/* Sección CTA — espejo del bloque !alreadyJoined de ProgolGeneral.tsx
-          web; mientras el Keychain no resuelve (meToken undefined) no se
-          renderiza nada. */}
-      {meToken !== undefined &&
-        (meToken ? (
-          // Nativo aún no tiene BottomNav: sin este botón, reabrir un join
-          // link ya consumido sería un callejón sin salida.
-          <Button
-            variant="primary"
-            className="mt-6 h-12 w-full rounded-2xl"
-            onPress={() =>
-              router.push({
-                pathname: "/q/[id]/me/[token]",
-                params: { id: quinielaId, token: meToken },
-              })
-            }
-          >
-            <Button.Label className="font-sans font-bold text-base text-primary-foreground">
-              Ir a Mi panel
-            </Button.Label>
-          </Button>
-        ) : canJoin ? (
+      {quiniela.notes ? (
+        <>
+          <SectionHeading>Notas</SectionHeading>
+          {/* RN <Text> preserva \n nativamente → no hace falta whitespace-pre-wrap. */}
+          <GrainCard className="rounded-2xl border border-border bg-card px-4 py-3">
+            <Text className="font-sans text-sm text-foreground/90">
+              {quiniela.notes}
+            </Text>
+          </GrainCard>
+        </>
+      ) : null}
+
+      {/* Tabla de posiciones. El sufijo "{decidedMatches} jugados" va como <Text>
+          anidado dentro del SectionHeading (que ya es un <Text>): en RN anidar
+          <Text> compone inline como el <span> web. */}
+      <SectionHeading>
+        Tabla de posiciones{" "}
+        <Text className="font-sans text-foreground/40">
+          {data.decidedMatches} jugados
+        </Text>
+      </SectionHeading>
+      <Leaderboard rows={data.leaderboard} onSelect={setViewing} />
+
+      {/* Link al torneo (web /q/:id/torneo → nativo /q/[id]/torneo). Label
+          condicional por formato (liga vs eliminatorio). */}
+      <Pressable
+        className="mt-6 flex-row items-center justify-between rounded-2xl border border-border bg-card px-4 py-3.5 active:opacity-70"
+        accessibilityRole="link"
+        accessibilityLabel={linkLabel}
+        onPress={() =>
+          router.push({ pathname: "/q/[id]/torneo", params: { id: quinielaId } })
+        }
+      >
+        <View className="flex-row items-center gap-2">
+          <Text className="font-sans text-lg">🌍</Text>
+          <Text className="font-sans font-semibold text-sm text-foreground">
+            {linkLabel}
+          </Text>
+        </View>
+        <Text className="font-sans text-sm text-muted-foreground">→</Text>
+      </Pressable>
+
+      {/* CTA — espejo del bloque !alreadyJoined de ProgolGeneral.tsx web. Mientras
+          el Keychain no resuelve (meToken undefined) no se renderiza nada (evita
+          parpadeo). Con token "me" (ya inscrito) tampoco: la web oculta el CTA y
+          el BottomNav ya navega a "Mi panel". Progol solo tiene UN mensaje de
+          cierre (no hay caso "no quedan lugares"). */}
+      {meToken === null ? (
+        canJoin ? (
           <FormularioUnirse titulo="🎯 Unirme a la quiniela" alUnirse={unirse} />
         ) : (
           <View className="mt-6 rounded-2xl border border-border bg-card px-4 py-3.5">
@@ -142,7 +212,14 @@ export function ProgolGeneral({ quinielaId, joinToken }: Props) {
               Las inscripciones ya están cerradas.
             </Text>
           </View>
-        ))}
-    </Pantalla>
+        )
+      ) : null}
+
+      <ViewCard
+        joinToken={joinToken}
+        participantId={viewing}
+        onClose={() => setViewing(null)}
+      />
+    </Shell>
   );
 }
