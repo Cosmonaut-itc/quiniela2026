@@ -7,7 +7,7 @@ import { internal } from "./_generated/api";
 import type { LiveLineupsData, LiveMatchLineupView, TeamLineupView, LineupPlayerView } from "./types";
 import type { Doc } from "./_generated/dataModel";
 import {
-  fetchLiveFixtures, fetchLineups, matchLiveFixture, orientLineups, isConfirmed,
+  fetchLiveFixtures, fetchFixturesByDate, fetchLineups, matchLiveFixture, orientLineups, isConfirmed,
   type LiveFixture, type MappedTeamLineup, type StoredLineups,
 } from "./lib/apiFootball";
 import type { Id } from "./_generated/dataModel";
@@ -40,15 +40,22 @@ export const upsertLineup = internalMutation({
 export type LiveMatchNeedingLineup = {
   matchId: Id<"matches">; tournamentCode: string;
   homeName: string; awayName: string; apiFixtureId: number | null; confirmed: boolean;
+  phase: "live" | "pre"; kickoffDate: string | null;
 };
 
-/** Partidos GLOBALMENTE en vivo (status real, no overrides) de los torneos `codes`
- *  (los activos los provee internal.tournaments.activeTournamentCodes desde la action),
- *  cuyo 11 aún no está confirmado en cache. Lo que el cron debe sondear.
- *  Una query no puede llamar a otra (no hay ctx.runQuery en QueryCtx); por eso los
- *  códigos llegan como argumento en vez de recalcularlos aquí. */
+// Ventana de pre-saque: sondeamos UNA vez la alineación de un partido agendado que
+// arranca dentro de este margen (la API la publica ~20-40 min antes). El "una vez"
+// lo garantiza el guard de "ya existe fila" más abajo, no el tamaño de la ventana.
+const PRE_KICKOFF_MS = 10 * 60 * 1000;
+
+/** Partidos que el cron debe sondear: GLOBALMENTE en vivo cuyo 11 aún no está
+ *  confirmado (fase "live"), MÁS agendados que arrancan en ≤10 min y aún no tienen
+ *  fila de lineup (fase "pre", una sola vez). Solo torneos en `codes` (los activos
+ *  los provee internal.tournaments.activeTournamentCodes desde la action).
+ *  `now` llega como argumento porque una query no puede usar Date.now() (debe ser
+ *  determinista) ni llamar a otra query (no hay ctx.runQuery en QueryCtx). */
 export const liveMatchesNeedingLineup = internalQuery({
-  args: { codes: v.array(v.string()) },
+  args: { codes: v.array(v.string()), now: v.number() },
   returns: v.array(v.object({
     matchId: v.id("matches"),
     tournamentCode: v.string(),
@@ -56,23 +63,34 @@ export const liveMatchesNeedingLineup = internalQuery({
     awayName: v.string(),
     apiFixtureId: v.union(v.number(), v.null()),
     confirmed: v.boolean(),
+    phase: v.union(v.literal("live"), v.literal("pre")),
+    kickoffDate: v.union(v.string(), v.null()),
   })),
-  handler: async (ctx, { codes }): Promise<LiveMatchNeedingLineup[]> => {
+  handler: async (ctx, { codes, now }): Promise<LiveMatchNeedingLineup[]> => {
     const active = new Set(codes);
     if (active.size === 0) return [];
 
     // Scan en memoria (≤ ~600 filas en free tier, igual que resolveQuiniela).
-    const matches = (await ctx.db.query("matches").collect()).filter(
-      (m) => m.status === "live" && active.has(tournamentCodeOf(m)),
+    const matches = (await ctx.db.query("matches").collect()).filter((m) =>
+      active.has(tournamentCodeOf(m)),
     );
 
     const out: LiveMatchNeedingLineup[] = [];
     for (const m of matches) {
+      const untilKickoff = m.kickoffAt - now;
+      const isLive = m.status === "live";
+      const isPre = m.status === "scheduled" && untilKickoff > 0 && untilKickoff <= PRE_KICKOFF_MS;
+      if (!isLive && !isPre) continue;
+
       const existing = await ctx.db
         .query("lineups")
         .withIndex("by_match", (q) => q.eq("matchId", m._id))
         .first();
-      if (existing?.confirmed) continue;
+      // live: si el 11 ya está confirmado no hay nada que sondear.
+      // pre: si ya hay CUALQUIER fila, ya lo sondeamos una vez → no repetir.
+      if (isLive && existing?.confirmed) continue;
+      if (isPre && existing) continue;
+
       const home = m.homeTeamId ? await ctx.db.get(m.homeTeamId) : null;
       const away = m.awayTeamId ? await ctx.db.get(m.awayTeamId) : null;
       out.push({
@@ -82,6 +100,8 @@ export const liveMatchesNeedingLineup = internalQuery({
         awayName: away?.name ?? "",
         apiFixtureId: existing?.apiFixtureId ?? null,
         confirmed: existing?.confirmed ?? false,
+        phase: isLive ? "live" : "pre",
+        kickoffDate: isLive ? null : new Date(m.kickoffAt).toISOString().slice(0, 10),
       });
     }
     return out;
@@ -97,27 +117,52 @@ export type LineupUpsert = {
 type LiveMatchInput = {
   matchId: string; tournamentCode: string;
   homeName: string; awayName: string; apiFixtureId: number | null; confirmed: boolean;
+  phase?: "live" | "pre";       // ausente = "live" (compat con llamadas legacy)
+  kickoffDate?: string | null;  // YYYY-MM-DD (UTC) para descubrir el fixture en fase "pre"
 };
 type SyncDeps = {
   fetchLive: () => Promise<LiveFixture[]>;
+  fetchByDate?: (date: string) => Promise<LiveFixture[]>; // requerido solo si hay candidatos "pre"
   fetchOne: (fixtureId: number) => Promise<MappedTeamLineup[]>;
   upsert: (u: LineupUpsert) => Promise<void>;
   now?: number;
 };
 
 /** Núcleo puro del ciclo (deps inyectadas para testear sin red ni Convex):
- *  0 llamadas si no hay partidos en vivo; si los hay, 1 live=all + 1 lineup por
- *  partido reconciliado. Un fallo por partido se loguea y no aborta el resto. */
+ *  0 llamadas si no hay candidatos. Los "live" se reconcilian contra /fixtures?live=all
+ *  (1 llamada); los "pre" (agendados por arrancar) no aparecen ahí, así que su fixture
+ *  se descubre por fecha (1 llamada por fecha distinta). Luego 1 lineup por partido
+ *  reconciliado. Un fallo por partido se loguea y no aborta el resto. */
 export async function runLineupSync(
-  live: LiveMatchInput[],
+  candidates: LiveMatchInput[],
   deps: SyncDeps,
 ): Promise<void> {
-  if (live.length === 0) return;
-  const fixtures = await deps.fetchLive();
+  if (candidates.length === 0) return;
   const now = deps.now ?? 0;
-  for (const m of live) {
+
+  const fixtures: LiveFixture[] = [];
+  if (candidates.some((c) => (c.phase ?? "live") === "live")) {
+    fixtures.push(...(await deps.fetchLive()));
+  }
+  const preDates = [
+    ...new Set(
+      candidates
+        .filter((c) => c.phase === "pre")
+        .map((c) => c.kickoffDate)
+        .filter((d): d is string => !!d),
+    ),
+  ];
+  if (deps.fetchByDate) {
+    for (const d of preDates) fixtures.push(...(await deps.fetchByDate(d)));
+  }
+  // live=all y la búsqueda por fecha pueden traer el mismo fixture: deduplica por id.
+  const byId = new Map<number, LiveFixture>();
+  for (const f of fixtures) if (!byId.has(f.fixtureId)) byId.set(f.fixtureId, f);
+  const uniqueFixtures = [...byId.values()];
+
+  for (const m of candidates) {
     try {
-      const fixture = matchLiveFixture(m, fixtures);
+      const fixture = matchLiveFixture(m, uniqueFixtures);
       if (!fixture) continue;
       const teams = await deps.fetchOne(fixture.fixtureId);
       const oriented = orientLineups(teams, fixture);
@@ -140,9 +185,11 @@ export const syncLineups = internalAction({
     if (!token) return { ok: false, error: "missing API_FOOTBALL_TOKEN" };
     // Reusa el helper canónico de "torneos con quiniela viva" (ADR-0001).
     const codes = await ctx.runQuery(internal.tournaments.activeTournamentCodes, {});
-    const live = await ctx.runQuery(internal.lineups.liveMatchesNeedingLineup, { codes });
+    const now = Date.now();
+    const live = await ctx.runQuery(internal.lineups.liveMatchesNeedingLineup, { codes, now });
     await runLineupSync(live, {
       fetchLive: () => fetchLiveFixtures(token),
+      fetchByDate: (date) => fetchFixturesByDate(token, date),
       fetchOne: (fixtureId) => fetchLineups(token, fixtureId),
       upsert: async (u) => {
         await ctx.runMutation(internal.lineups.upsertLineup, {
