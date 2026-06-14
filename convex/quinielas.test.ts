@@ -516,3 +516,42 @@ describe("notes", () => {
     expect(admin.quiniela.notes).toBe("Reglas aquí");
   });
 });
+
+describe("updateQuinielaPhoto", () => {
+  it("setea el photoId de la quiniela autenticando por adminToken", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Foto", prizeText: "$1", numParticipants: 4,
+    });
+    const photoId = await t.run(async (ctx) => await ctx.storage.store(new Blob(["x"])));
+    const res = await t.mutation(api.quinielas.updateQuinielaPhoto, {
+      adminToken: q.adminToken, photoId,
+    });
+    expect(res.ok).toBe(true);
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.photoId).toBe(photoId);
+  });
+
+  it("borra la foto anterior al reemplazarla (best-effort)", async () => {
+    const t = await seeded();
+    const q = await t.mutation(api.quinielas.createQuiniela, {
+      name: "Foto", prizeText: "$1", numParticipants: 4,
+    });
+    const first = await t.run(async (ctx) => await ctx.storage.store(new Blob(["a"])));
+    await t.mutation(api.quinielas.updateQuinielaPhoto, { adminToken: q.adminToken, photoId: first });
+    const second = await t.run(async (ctx) => await ctx.storage.store(new Blob(["b"])));
+    await t.mutation(api.quinielas.updateQuinielaPhoto, { adminToken: q.adminToken, photoId: second });
+    const qn = await t.run((ctx) => ctx.db.get(q.quinielaId));
+    expect(qn!.photoId).toBe(second);
+    const url = await t.run((ctx) => ctx.storage.getUrl(first));
+    expect(url).toBeNull();
+  });
+
+  it("rechaza un adminToken inválido", async () => {
+    const t = await seeded();
+    const photoId = await t.run(async (ctx) => await ctx.storage.store(new Blob(["x"])));
+    await expect(
+      t.mutation(api.quinielas.updateQuinielaPhoto, { adminToken: "no-existe", photoId }),
+    ).rejects.toThrow("Quiniela no encontrada");
+  });
+});

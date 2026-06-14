@@ -61,6 +61,30 @@ export const generateUploadUrl = mutation({
   handler: async (ctx) => await ctx.storage.generateUploadUrl(),
 });
 
+export const updateQuinielaPhoto = mutation({
+  args: { adminToken: v.string(), photoId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    const qn = await ctx.db
+      .query("quinielas")
+      .withIndex("by_adminToken", (q) => q.eq("adminToken", args.adminToken))
+      .first();
+    if (!qn) throw new Error("Quiniela no encontrada");
+    const oldPhotoId = qn.photoId;
+    await ctx.db.patch(qn._id, { photoId: args.photoId });
+    // El borrado de la foto anterior es limpieza best-effort: si falla, preferimos
+    // dejar un blob huérfano antes que revertir la mutación y perder el cambio
+    // (mismo tradeoff que updateParticipantPhoto).
+    if (oldPhotoId && oldPhotoId !== args.photoId) {
+      try {
+        await ctx.storage.delete(oldPhotoId);
+      } catch {
+        console.warn("updateQuinielaPhoto: no se pudo borrar la foto anterior", oldPhotoId);
+      }
+    }
+    return { ok: true as const };
+  },
+});
+
 export const createQuiniela = mutation({
   args: {
     name: v.string(),
