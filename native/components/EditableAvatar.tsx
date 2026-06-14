@@ -27,16 +27,22 @@ export function EditableAvatar({
 }) {
   const { pickAndUpload, busy } = usePhotoUpload();
   const [saving, setSaving] = useState(false);
+  // Preview optimista: muestra la foto recién elegida de inmediato. Es lo que se
+  // ve en pantallas sin `url` reactiva (p. ej. Crear quiniela) y da feedback
+  // instantáneo en las que sí la tienen, antes de que el round-trip la actualice.
+  const [localUri, setLocalUri] = useState<string | null>(null);
   const working = busy || saving;
 
   async function onPressCamera() {
     const r = await pickAndUpload();
     if (!r) return; // cancelado / sin permiso / fallo (console.warn en el hook)
+    setLocalUri(r.uri);
     setSaving(true);
     try {
       await onUploaded(r.photoId);
     } catch (e) {
       console.warn("EditableAvatar: onUploaded falló", e);
+      setLocalUri(null); // no se guardó: revierte al `url` real
     } finally {
       setSaving(false);
     }
@@ -45,7 +51,7 @@ export function EditableAvatar({
   return (
     <View className="relative shrink-0">
       <View className={ringClassName}>
-        <Avatar name={name} url={url} size={size} />
+        <Avatar name={name} url={localUri ?? url} size={size} />
       </View>
       {working && (
         <View className="absolute inset-0 items-center justify-center rounded-full bg-background/60">
