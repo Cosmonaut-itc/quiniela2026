@@ -43,3 +43,13 @@ jest.mock("expo-font", () => {
     isLoaded: jest.fn(() => true),
   };
 });
+
+// expo-image-picker: usePhotoUpload (vía EditableAvatar en las vistas personales)
+// importa este módulo. En jest no hay galería ni permisos nativos; se stubea para
+// que el árbol monte. Por defecto el usuario "cancela" (canceled: true) y los
+// permisos se conceden — los tests que ejercitan la subida sobre-escriben estos
+// mocks con jest.mock local.
+jest.mock("expo-image-picker", () => ({
+  requestMediaLibraryPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+}));
