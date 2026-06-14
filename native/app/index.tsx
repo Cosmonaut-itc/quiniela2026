@@ -95,6 +95,18 @@ export default function Index() {
         Quiniela 2026
       </Text>
 
+      {/* CTA principal: crear una nueva quiniela */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Crear quiniela"
+        onPress={() => router.push("/crear")}
+        className="mt-5 h-12 items-center justify-center rounded-2xl bg-primary active:opacity-80"
+      >
+        <Text className="font-sans text-base font-bold text-primary-foreground">
+          ⚽ Crear quiniela
+        </Text>
+      </Pressable>
+
       {/* Sección "Tus quinielas" — solo cuando hay paneles guardados */}
       {estado.cargado && estado.paneles.length > 0 && (
         <View className="mt-6">

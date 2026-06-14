@@ -9,7 +9,7 @@
  * Módulo puro: sin imports de DOM, React ni Expo.
  */
 
-export type TokenKind = "me" | "join";
+export type TokenKind = "me" | "join" | "admin";
 
 /** Clave canónica web: `quiniela:${id}:${kind}` (la usa localStorage tal cual). */
 export function storageKey(id: string, kind: TokenKind): string {
