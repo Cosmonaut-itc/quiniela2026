@@ -38,8 +38,20 @@ export function computeTeamStates(teams: TeamRow[], matches: MatchRow[]): Map<st
     }
   }
 
-  // group teams absent from a populated bracket → out
-  if (groupsDone && knockoutTeams.size > 0) {
+  // La primera ronda eliminatoria (la más temprana con partidos) debe estar
+  // COMPLETAMENTE sembrada antes de eliminar a nadie por ausencia del bracket.
+  // El bracket se llena de forma incremental (la API publica los cruces poco a
+  // poco; los que dependen de mejores terceros tardan): con cupos vacíos aún no
+  // sabemos quién quedó fuera, así que esperar evita eliminar a clasificados.
+  const firstKnockoutStage = STAGE_ORDER.find(
+    (s) => isKnockout(s) && matches.some((mt) => mt.stage === s),
+  );
+  const firstRound = matches.filter((mt) => mt.stage === firstKnockoutStage);
+  const firstRoundSeeded =
+    firstRound.length > 0 && firstRound.every((mt) => mt.homeTeamId && mt.awayTeamId);
+
+  // group teams absent from a fully-seeded bracket → out
+  if (groupsDone && firstRoundSeeded) {
     for (const t of teams) {
       if (!knockoutTeams.has(t._id)) {
         const st = states.get(t._id)!;

@@ -33,6 +33,26 @@ describe("computeTeamStates", () => {
     expect(states.get("d")!.alive).toBe(false);
   });
 
+  it("does NOT eliminate group teams while the first knockout round is still being seeded", () => {
+    // Regresión (jun-2026, prod): la fase de grupos terminó pero la API solo había
+    // colocado parte de los cruces de 16vos. Los clasificados cuyo cupo aún no se
+    // sembró NO deben marcarse como eliminados.
+    const teams = [team("a"), team("b"), team("c"), team("d")];
+    const matches = [
+      m({ stage: "group", homeTeamId: "a", awayTeamId: "b", status: "finished", homeScore: 1, awayScore: 0, winnerTeamId: "a" }),
+      m({ stage: "group", homeTeamId: "c", awayTeamId: "d", status: "finished", homeScore: 2, awayScore: 1, winnerTeamId: "c" }),
+      // bracket a medio sembrar: un partido con ambos equipos, otro todavía vacío
+      m({ stage: "r32", group: undefined, homeTeamId: "a", awayTeamId: "c", status: "scheduled" }),
+      m({ stage: "r32", group: undefined, homeTeamId: null, awayTeamId: null, status: "scheduled" }),
+    ];
+    const states = computeTeamStates(teams, matches);
+    expect(states.get("a")!.alive).toBe(true);
+    expect(states.get("c")!.alive).toBe(true);
+    // b y d aún no están en el bracket, pero como no está completo siguen vivos
+    expect(states.get("b")!.alive).toBe(true);
+    expect(states.get("d")!.alive).toBe(true);
+  });
+
   it("eliminates the loser of a finished knockout match", () => {
     const teams = [team("a"), team("c")];
     const matches = [
