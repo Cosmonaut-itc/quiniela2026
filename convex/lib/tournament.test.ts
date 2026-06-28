@@ -1,6 +1,6 @@
 // convex/lib/tournament.test.ts
 import { describe, it, expect } from "vitest";
-import { computeTeamStates, computeGroupStandings, type TeamRow, type MatchRow } from "./tournament";
+import { computeTeamStates, computeGroupStandings, computeQualifiers, type TeamRow, type MatchRow } from "./tournament";
 
 const team = (id: string, group = "A"): TeamRow => ({ _id: id, group });
 const m = (p: Partial<MatchRow>): MatchRow => ({
@@ -73,6 +73,50 @@ describe("computeTeamStates", () => {
     expect(states.get("a")!.currentStage).toBe("champion");
     expect(states.get("a")!.alive).toBe(true);
     expect(states.get("c")!.alive).toBe(false);
+  });
+});
+
+describe("computeQualifiers", () => {
+  // Dos grupos de 3; gana el de más puntos. Resultados deterministas:
+  // Grupo A: a1 > a2 > a3   |  Grupo B: b1 > b2 > b3
+  const teams: TeamRow[] = [
+    team("a1", "A"), team("a2", "A"), team("a3", "A"),
+    team("b1", "B"), team("b2", "B"), team("b3", "B"),
+  ];
+  const fin = (h: string, a: string, hs: number, as: number, g: string): MatchRow =>
+    m({ stage: "group", group: g, homeTeamId: h, awayTeamId: a, status: "finished",
+        homeScore: hs, awayScore: as, winnerTeamId: hs > as ? h : as > hs ? a : null });
+  const matches = [
+    // Grupo A: a1 6pts, a2 3pts (gd menor), a3 0pts
+    fin("a1", "a2", 1, 0, "A"), fin("a1", "a3", 5, 0, "A"), fin("a2", "a3", 1, 0, "A"),
+    // Grupo B: b1 6pts, b2 3pts (gd mayor que a2), b3 0pts
+    fin("b1", "b2", 1, 0, "B"), fin("b1", "b3", 2, 0, "B"), fin("b2", "b3", 4, 0, "B"),
+  ];
+
+  it("clasifica al 1º y 2º de cada grupo", () => {
+    const q = computeQualifiers(teams, matches, 0);
+    expect(q.has("a1")).toBe(true);
+    expect(q.has("a2")).toBe(true);
+    expect(q.has("b1")).toBe(true);
+    expect(q.has("b2")).toBe(true);
+    expect(q.has("a3")).toBe(false);
+    expect(q.has("b3")).toBe(false);
+  });
+
+  it("clasifica solo a los mejores N terceros y excluye al resto", () => {
+    // a3: 0pts gd=-6 ; b3: 0pts gd=-6 gf=0 — empatados; ninguno califica con thirds=0,
+    // pero con thirds=1 entra exactamente uno (el de mejor gd/gf). Usamos un tercero
+    // claramente mejor para que el orden sea inequívoco.
+    const teams2 = [...teams, team("c1", "C"), team("c2", "C"), team("c3", "C")];
+    const matches2 = [
+      ...matches,
+      // Grupo C: c3 termina 3º con 3 pts (mejor que a3/b3 con 0) → debe ser el mejor tercero
+      fin("c1", "c2", 1, 0, "C"), fin("c1", "c3", 1, 0, "C"), fin("c3", "c2", 3, 0, "C"),
+    ];
+    const q = computeQualifiers(teams2, matches2, 1);
+    expect(q.has("c3")).toBe(true);  // mejor tercero (3 pts) clasifica
+    expect(q.has("a3")).toBe(false); // terceros peores quedan fuera
+    expect(q.has("b3")).toBe(false);
   });
 });
 

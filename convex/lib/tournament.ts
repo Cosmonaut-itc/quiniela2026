@@ -80,6 +80,30 @@ export function computeTeamStates(teams: TeamRow[], matches: MatchRow[]): Map<st
   return states;
 }
 
+// Clasificados por TABLA (no por bracket): 1º y 2º de cada grupo + los mejores
+// `thirdsQualify` terceros (formato Mundial 2026 = 8). Tiebreak igual que
+// computeGroupStandings: puntos, dif. de goles, goles a favor. SOLO para limpiezas
+// puntuales (p. ej. revertir avisos de eliminación emitidos con el bracket a medio
+// sembrar); el estado en vivo se deriva del bracket en computeTeamStates.
+export function computeQualifiers(
+  teams: TeamRow[],
+  matches: MatchRow[],
+  thirdsQualify = 8,
+): Set<string> {
+  const groups = [...new Set(teams.map((t) => t.group))].filter(Boolean);
+  const qualifiers = new Set<string>();
+  const thirds: { teamId: string; points: number; gd: number; gf: number }[] = [];
+  for (const g of groups) {
+    const s = computeGroupStandings(g, teams, matches);
+    if (s[0]) qualifiers.add(s[0].teamId);
+    if (s[1]) qualifiers.add(s[1].teamId);
+    if (s[2]) thirds.push(s[2]);
+  }
+  thirds.sort((x, y) => y.points - x.points || y.gd - x.gd || y.gf - x.gf);
+  for (const t of thirds.slice(0, thirdsQualify)) qualifiers.add(t.teamId);
+  return qualifiers;
+}
+
 export function computeGroupStandings(group: string, teams: TeamRow[], matches: MatchRow[]) {
   const inGroup = teams.filter((t) => t.group === group);
   const stat = new Map(inGroup.map((t) => [t._id, { teamId: t._id, points: 0, gf: 0, ga: 0 }]));

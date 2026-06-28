@@ -45,6 +45,68 @@ describe("backfillTournamentCode", () => {
   });
 });
 
+describe("cleanupWrongEliminationNotifications", () => {
+  it("borra avisos de eliminación de clasificados y disqualified afectados; conserva los legítimos", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async (ctx) => {
+      const mk = (code: string, ext: string) =>
+        ctx.db.insert("teams", {
+          code, name: code, flag: "🏳️", group: "A", alive: false,
+          currentStage: "out", externalId: ext, tournamentCode: "WC",
+        });
+      // Grupo A: a1 > a2 > a3 (clasifican) > a4 (eliminado real)
+      const a1 = await mk("A1", "a1"); const a2 = await mk("A2", "a2");
+      const a3 = await mk("A3", "a3"); const a4 = await mk("A4", "a4");
+      const fin = (h: string, a: string) =>
+        ctx.db.insert("matches", {
+          stage: "group", group: "A", homeTeamId: h as never, awayTeamId: a as never,
+          homeScore: 1, awayScore: 0, status: "finished", winnerTeamId: h as never,
+          kickoffAt: 1, externalId: `${h}-${a}`, tournamentCode: "WC",
+        });
+      await fin(a1, a2); await fin(a1, a3); await fin(a1, a4);
+      await fin(a2, a3); await fin(a2, a4); await fin(a3, a4);
+
+      const quinielaId = await ctx.db.insert("quinielas", {
+        name: "Q", prizeText: "", numParticipants: 2, slotSizes: [2, 2],
+        adminToken: "a", joinToken: "j", status: "locked", createdAt: 1, tournamentCode: "WC",
+      });
+      const p1 = await ctx.db.insert("participants", {
+        quinielaId, name: "P1", personalToken: "p1", slotIndex: 0, joinedAt: 1,
+      });
+      const p2 = await ctx.db.insert("participants", {
+        quinielaId, name: "P2", personalToken: "p2", slotIndex: 1, joinedAt: 1,
+      });
+      await ctx.db.insert("ownerships", { quinielaId, teamId: a1, participantId: p1 });
+      await ctx.db.insert("ownerships", { quinielaId, teamId: a4, participantId: p2 });
+
+      const notif = (type: string, extra: Record<string, unknown>, key: string) =>
+        ctx.db.insert("notifications", {
+          quinielaId, audience: "participant", type, title: "t", body: "b",
+          createdAt: 1, dedupeKey: key, ...extra,
+        });
+      // erróneo (clasificado) vs legítimo (eliminado real)
+      await notif("team_eliminated", { participantId: p1, teamId: a1 }, "k1");
+      await notif("team_eliminated", { participantId: p2, teamId: a4 }, "k2");
+      // disqualified de P1 (tiene clasificado → erróneo) vs P2 (solo eliminado → legítimo)
+      await notif("disqualified", { participantId: p1 }, "k3");
+      await notif("disqualified", { participantId: p2 }, "k4");
+      return { a1, a4, p1, p2 };
+    });
+
+    const first = await t.mutation(internal.migrations.cleanupWrongEliminationNotifications, {});
+    expect(first).toEqual({ teamEliminated: 1, disqualified: 1 });
+
+    await t.run(async (ctx) => {
+      const ns = await ctx.db.query("notifications").collect();
+      const keys = ns.map((n) => n.dedupeKey).sort();
+      expect(keys).toEqual(["k2", "k4"]); // se quedan el del eliminado real y su disqualified
+    });
+
+    const second = await t.mutation(internal.migrations.cleanupWrongEliminationNotifications, {});
+    expect(second).toEqual({ teamEliminated: 0, disqualified: 0 });
+  });
+});
+
 describe("cleanupForeignOwnerships", () => {
   it("borra ownerships de otro torneo y conserva las del torneo (incl. legacy)", async () => {
     const t = convexTest(schema, modules);
