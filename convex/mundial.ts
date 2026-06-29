@@ -55,6 +55,7 @@ async function buildBrackets(ctx: QueryCtx, quinielaId: Id<"quinielas">): Promis
         away: mt.awayTeamId ? { team: teamLite(teamById.get(mt.awayTeamId))!, owner: ownerName(mt.awayTeamId) } : null,
         homeScore: e.homeScore, awayScore: e.awayScore,
         winnerTeamId: e.winnerTeamId, status: e.status,
+        kickoffAt: mt.kickoffAt,
       };
     }),
   })).filter((s) => s.matches.length > 0);

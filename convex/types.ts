@@ -63,7 +63,8 @@ export type MundialData = {
              matches: { home: { team: TeamLite; owner: string } | null;
                         away: { team: TeamLite; owner: string } | null;
                         homeScore: number | null; awayScore: number | null;
-                        winnerTeamId: string | null; status: string }[] }[];
+                        winnerTeamId: string | null; status: string;
+                        kickoffAt: number }[] }[];
 };
 
 // El torneo de una quiniela, para que la UI adapte vista y labels.

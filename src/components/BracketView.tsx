@@ -1,6 +1,7 @@
 import type { MundialData } from "@/../convex/types";
 import { TeamFlag } from "@/components/TeamCard";
 import { cn } from "@/lib/utils";
+import { whenLabel } from "@shared/format";
 
 type BracketMatch = MundialData["bracket"][number]["matches"][number];
 type Side = BracketMatch["home"];
@@ -94,6 +95,9 @@ function MatchCard({
             </span>
           </div>
         )}
+      </div>
+      <div className="border-t border-border/60 px-2.5 py-1 text-center text-[0.6rem] text-muted-foreground tabular-nums">
+        {whenLabel(m.kickoffAt)}
       </div>
     </div>
   );

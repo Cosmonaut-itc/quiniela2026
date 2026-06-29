@@ -14,6 +14,7 @@ type Bracket = MundialData["bracket"];
 
 const MEX = { code: "MEX", name: "México", flag: "🇲🇽", group: "A" };
 const BRA = { code: "BRA", name: "Brasil", flag: "🇧🇷", group: "B" };
+const KICKOFF = Date.UTC(2026, 5, 13, 18, 30);
 
 describe("BracketView", () => {
   it("bracket vacío → muestra la copia de estado vacío", () => {
@@ -34,6 +35,7 @@ describe("BracketView", () => {
             awayScore: null,
             winnerTeamId: null,
             status: "scheduled",
+            kickoffAt: KICKOFF,
           },
         ],
       },
@@ -57,6 +59,7 @@ describe("BracketView", () => {
             awayScore: 1,
             winnerTeamId: "MEX",
             status: "finished",
+            kickoffAt: KICKOFF,
           },
         ],
       },
@@ -82,6 +85,7 @@ describe("BracketView", () => {
             awayScore: 1,
             winnerTeamId: null,
             status: "finished",
+            kickoffAt: KICKOFF,
           },
         ],
       },
@@ -105,6 +109,7 @@ describe("BracketView", () => {
             awayScore: null,
             winnerTeamId: null,
             status: "scheduled",
+            kickoffAt: KICKOFF,
           },
         ],
       },
@@ -127,6 +132,7 @@ describe("BracketView", () => {
             awayScore: null,
             winnerTeamId: null,
             status: "scheduled",
+            kickoffAt: KICKOFF,
           },
         ],
       },
@@ -149,6 +155,7 @@ describe("BracketView", () => {
             awayScore: null,
             winnerTeamId: null,
             status: "scheduled",
+            kickoffAt: KICKOFF,
           },
         ],
       },
