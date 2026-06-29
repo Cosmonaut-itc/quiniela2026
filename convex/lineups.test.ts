@@ -137,6 +137,26 @@ describe("liveMatchesNeedingLineup — ventana pre-partido (10 min antes)", () =
   });
 });
 
+const HOUR = 60 * MIN;
+
+describe("liveMatchesNeedingLineup — ventana de lectura (#5: índice by_kickoff, no escanear)", () => {
+  it("SÍ sondea un 'live' cuyo saque fue hace 3h (dentro de la ventana de 6h)", async () => {
+    const t = convexTest(schema, modules);
+    await t.run((ctx) =>
+      ctx.db.insert("matches", { stage: "group", kickoffAt: NOW - 3 * HOUR, status: "live", externalId: "recent", tournamentCode: "WC" }));
+    const out = await t.query(internal.lineups.liveMatchesNeedingLineup, { codes: ["WC"], now: NOW });
+    expect(out).toHaveLength(1);
+  });
+
+  it("NO sondea un 'live' fantasma cuyo saque fue hace >6h (fuera de la ventana): ningún partido real dura tanto", async () => {
+    const t = convexTest(schema, modules);
+    await t.run((ctx) =>
+      ctx.db.insert("matches", { stage: "group", kickoffAt: NOW - 7 * HOUR, status: "live", externalId: "stale", tournamentCode: "WC" }));
+    const out = await t.query(internal.lineups.liveMatchesNeedingLineup, { codes: ["WC"], now: NOW });
+    expect(out).toEqual([]);
+  });
+});
+
 import { api } from "./_generated/api";
 import { runLineupSync } from "./lineups";
 import { vi } from "vitest";

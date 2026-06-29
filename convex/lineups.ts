@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { teamLineupValidator } from "./lib/lineupShape";
 import { tournamentCodeOf } from "./lib/tournaments";
 import { syncCronEnabled } from "./lib/syncGate";
+import { SYNC_PAST_MS } from "./lib/syncWindow";
 import { teamLite } from "./lib/view";
 import { internal } from "./_generated/api";
 import type { LiveLineupsData, LiveMatchLineupView, TeamLineupView, LineupPlayerView } from "./types";
@@ -71,10 +72,20 @@ export const liveMatchesNeedingLineup = internalQuery({
     const active = new Set(codes);
     if (active.size === 0) return [];
 
-    // Scan en memoria (≤ ~600 filas en free tier, igual que resolveQuiniela).
-    const matches = (await ctx.db.query("matches").collect()).filter((m) =>
-      active.has(tournamentCodeOf(m)),
-    );
+    // Lectura acotada por índice (antes escaneaba TODA la tabla cada 5 min). Un
+    // partido solo puede ser "live" o "pre" si su saque cae en
+    // [now - SYNC_PAST_MS, now + PRE_KICKOFF_MS]: el predicado de abajo descartaría
+    // cualquier otra fila igual, así que el resultado es idéntico pero leemos solo
+    // las filas cercanas a "now". `by_kickoff` incluye filas legacy WC (indexa por
+    // kickoff sin importar tournamentCode).
+    const matches = (
+      await ctx.db
+        .query("matches")
+        .withIndex("by_kickoff", (q) =>
+          q.gte("kickoffAt", now - SYNC_PAST_MS).lte("kickoffAt", now + PRE_KICKOFF_MS),
+        )
+        .collect()
+    ).filter((m) => active.has(tournamentCodeOf(m)));
 
     const out: LiveMatchNeedingLineup[] = [];
     for (const m of matches) {
