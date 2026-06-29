@@ -146,6 +146,20 @@ export const upsertTeam = internalMutation({
   },
 });
 
+/** ¿El partido almacenado difiere de los campos entrantes en algún campo persistible?
+ *  El cron sincroniza TODOS los partidos del torneo cada 5 min; saltar el patch cuando
+ *  nada cambió (un finalizado nunca cambia) evita la reescritura incondicional que
+ *  inflaba el Database I/O. Compara solo las claves que se van a escribir. */
+export function matchFieldsChanged(
+  existing: Record<string, unknown>,
+  fields: Record<string, unknown>,
+): boolean {
+  for (const key of Object.keys(fields)) {
+    if (existing[key] !== fields[key]) return true;
+  }
+  return false;
+}
+
 export const upsertMatchResult = internalMutation({
   args: { tournamentCode: v.string(), match: apiMatch },
   returns: v.null(),
@@ -193,8 +207,13 @@ export const upsertMatchResult = internalMutation({
       externalId: match.externalId,
       bracketSlot: match.bracketSlot ?? existing?.bracketSlot,
     };
-    if (existing) await ctx.db.patch(existing._id, fields);
-    else await ctx.db.insert("matches", fields);
+    if (existing) {
+      // Saltar el patch cuando nada cambió: el grueso del Database I/O eran
+      // reescrituras incondicionales de partidos sin novedad cada 5 minutos.
+      if (matchFieldsChanged(existing, fields)) await ctx.db.patch(existing._id, fields);
+    } else {
+      await ctx.db.insert("matches", fields);
+    }
 
     // Si el partido tiene grupo y algún equipo aún no tiene grupo asignado, asignárselo
     if (match.group) {
