@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { fetchMatches, fetchTeams } from "./lib/footballData";
 import { tournamentByCode } from "./lib/tournaments";
+import { syncCronEnabled } from "./lib/syncGate";
 
 // The Convex runtime exposes deployment env vars on process.env; declare it
 // narrowly so the V8-runtime tsconfig (no "node" types) typechecks without
@@ -73,6 +74,8 @@ export const syncMatches = internalAction({
   args: {},
   returns: v.object({ ok: v.boolean(), synced: v.array(v.string()) }),
   handler: async (ctx): Promise<{ ok: boolean; synced: string[] }> => {
+    // dev (o kill-switch de emergencia en prod) apaga el cron con DISABLE_SYNC=1.
+    if (!syncCronEnabled(process.env)) return { ok: true, synced: [] };
     const codes = await ctx.runQuery(internal.tournaments.activeTournamentCodes, {});
     const synced = await runSyncCycle(
       codes,

@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, internalAction, query } from "./_gener
 import { v } from "convex/values";
 import { teamLineupValidator } from "./lib/lineupShape";
 import { tournamentCodeOf } from "./lib/tournaments";
+import { syncCronEnabled } from "./lib/syncGate";
 import { teamLite } from "./lib/view";
 import { internal } from "./_generated/api";
 import type { LiveLineupsData, LiveMatchLineupView, TeamLineupView, LineupPlayerView } from "./types";
@@ -181,6 +182,8 @@ export const syncLineups = internalAction({
   args: {},
   returns: v.object({ ok: v.boolean(), error: v.optional(v.string()) }),
   handler: async (ctx): Promise<{ ok: boolean; error?: string }> => {
+    // dev (o kill-switch de emergencia en prod) apaga el cron con DISABLE_SYNC=1.
+    if (!syncCronEnabled(process.env)) return { ok: true };
     const token = process.env.API_FOOTBALL_TOKEN;
     if (!token) return { ok: false, error: "missing API_FOOTBALL_TOKEN" };
     // Reusa el helper canónico de "torneos con quiniela viva" (ADR-0001).
