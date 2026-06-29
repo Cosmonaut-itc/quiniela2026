@@ -7,8 +7,11 @@ import { resolveQuiniela } from "./lib/perQuiniela";
 import { detectSyncEvents, type NotifyIntent } from "./lib/notify";
 import { detectProgolEvents } from "./lib/progol";
 import { gameModeOf } from "./lib/view";
+import { MATCH_SOON_MS } from "./lib/syncWindow";
 
-const SOON_MS = 65 * 60_000;
+// Ventana del aviso match_soon. Fuente única en lib/syncWindow para que NO se
+// desincronice con el idle-gate del cron (que usa el MISMO margen como cota).
+const SOON_MS = MATCH_SOON_MS;
 
 /** Inserta un aviso si no existe ya uno con su dedupeKey (emite-una-vez). La UNICIDAD de un
  *  aviso la garantiza ESTE helper vía el índice by_dedupe (Convex no tiene índices únicos a

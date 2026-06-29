@@ -1,10 +1,11 @@
 // convex/sync.ts
-import { internalAction } from "./_generated/server";
+import { internalAction, internalQuery, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { fetchMatches, fetchTeams } from "./lib/footballData";
 import { tournamentByCode } from "./lib/tournaments";
 import { syncCronEnabled } from "./lib/syncGate";
+import { anyMatchDueForSync, MATCH_SOON_MS, SYNC_PAST_MS } from "./lib/syncWindow";
 
 // The Convex runtime exposes deployment env vars on process.env; declare it
 // narrowly so the V8-runtime tsconfig (no "node" types) typechecks without
@@ -69,6 +70,53 @@ export async function runSyncCycle(
   return synced;
 }
 
+/** ¿El torneo `code` tiene AL MENOS un partido sembrado? Sonda barata por índice
+ *  (una fila). WC arrastra filas legacy con tournamentCode AUSENTE (= "WC"): se
+ *  cuentan para no tratar un WC ya sembrado como "vacío". */
+async function hasAnySeededMatch(ctx: QueryCtx, code: string): Promise<boolean> {
+  const direct = await ctx.db
+    .query("matches")
+    .withIndex("by_tournament_kickoff", (q) => q.eq("tournamentCode", code))
+    .first();
+  if (direct) return true;
+  if (code === "WC") {
+    const legacy = await ctx.db
+      .query("matches")
+      .withIndex("by_tournament_kickoff", (q) => q.eq("tournamentCode", undefined))
+      .first();
+    if (legacy) return true;
+  }
+  return false;
+}
+
+/** Idle-gate: ¿algún partido de un torneo activo está en vivo o por comenzar?
+ *  Lee SOLO la ventana cercana a `now` por el índice by_kickoff (no escanea la
+ *  tabla) e incluye filas legacy WC (el índice ignora tournamentCode). La decisión
+ *  pura vive en lib/syncWindow para poder testearla sin DB. */
+export const anyDueForSync = internalQuery({
+  args: { codes: v.array(v.string()), now: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, { codes, now }): Promise<boolean> => {
+    if (codes.length === 0) return false;
+    const near = await ctx.db
+      .query("matches")
+      .withIndex("by_kickoff", (q) =>
+        q.gte("kickoffAt", now - SYNC_PAST_MS).lte("kickoffAt", now + MATCH_SOON_MS),
+      )
+      .collect();
+    if (anyMatchDueForSync(near, codes, now)) return true;
+    // Red de seguridad de sembrado: un torneo activo SIN ningún partido sembrado
+    // debe sincronizarse (prepare suele sembrar al crear la quiniela, pero si el
+    // torneo tenía equipos y aún no fixtures, el cron los descubre). Un torneo YA
+    // sembrado —aunque todo finalizado— NO entra aquí: así no reabrimos el
+    // always-on para quinielas viejas de torneos terminados.
+    for (const code of codes) {
+      if (!(await hasAnySeededMatch(ctx, code))) return true;
+    }
+    return false;
+  },
+});
+
 /** Entrada del cron: recorre los torneos con quinielas vivas, espaciado. */
 export const syncMatches = internalAction({
   args: {},
@@ -77,6 +125,13 @@ export const syncMatches = internalAction({
     // dev (o kill-switch de emergencia en prod) apaga el cron con DISABLE_SYNC=1.
     if (!syncCronEnabled(process.env)) return { ok: true, synced: [] };
     const codes = await ctx.runQuery(internal.tournaments.activeTournamentCodes, {});
+    // Idle-gate: si ningún partido está en vivo ni por comenzar, no hay nada que
+    // hacer este ciclo — saltamos fetch + upserts + recompute + detect (el grueso
+    // del Database I/O) hasta que se acerque un partido.
+    const now = Date.now();
+    if (!(await ctx.runQuery(internal.sync.anyDueForSync, { codes, now }))) {
+      return { ok: true, synced: [] };
+    }
     const synced = await runSyncCycle(
       codes,
       (code) => ctx.runAction(internal.sync.syncTournament, { code }),
