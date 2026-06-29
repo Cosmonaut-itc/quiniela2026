@@ -20,6 +20,7 @@ import type * as lib_progol from "../lib/progol.js";
 import type * as lib_push from "../lib/push.js";
 import type * as lib_resolve from "../lib/resolve.js";
 import type * as lib_standings from "../lib/standings.js";
+import type * as lib_syncGate from "../lib/syncGate.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_tournament from "../lib/tournament.js";
 import type * as lib_tournaments from "../lib/tournaments.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "lib/push": typeof lib_push;
   "lib/resolve": typeof lib_resolve;
   "lib/standings": typeof lib_standings;
+  "lib/syncGate": typeof lib_syncGate;
   "lib/tokens": typeof lib_tokens;
   "lib/tournament": typeof lib_tournament;
   "lib/tournaments": typeof lib_tournaments;
