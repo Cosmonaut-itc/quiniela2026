@@ -1,15 +1,11 @@
 # quiniela2026
 
-## Agent skills
+Quinielas entre conocidos sin cuentas: la identidad es un link con token. Un
+backend Convex (`convex/`), dos clientes: web (`src/`) y Expo iOS (`native/`).
 
-### Issue tracker
+Antes de explorar el código o de nombrar un concepto de dominio, lee
+`CONTEXT.md` y los ADR de `docs/adr/` de tu área — `docs/agents/domain.md` fija
+cómo consumirlos.
 
-Issues live in **Linear** (workspace `mdr`, project "Quiniela App" `f16b52fd26fa`) via the official Linear MCP plugin. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Híbrido nativo de Linear: `needs-triage`→estado Triage, `wontfix`→estado Canceled; `needs-info`/`ready-for-agent`/`ready-for-human` como labels. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: un `CONTEXT.md` + `docs/adr/` en la raíz. See `docs/agents/domain.md`.
+Antes de tocar un issue o PRD, lee `docs/agents/issue-tracker.md` (Linear) y
+`docs/agents/triage-labels.md`.
